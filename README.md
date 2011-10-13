@@ -17,3 +17,12 @@ The package can be installed by running the following commands:
 Done! On OS X, `PACKAGE_DIR` is `~/Library/Application Support/Sublime Text 2/Packages/`. PolyML should show up as an option under Build Systems, and `.ML` files should highlight correctly.
 
 The package provides the command 'run_poly', which can be bound to a hotkey, called from another plugin, etc.
+
+Configuration
+-------------
+
+At some point, I'll add some smarts so that the package can find Poly/ML on most systems. In the mean time, add the following line to your `Base File.sublime-settings`:
+
+    "poly_bin": "/usr/local/bin/poly"
+
+Where `"/usr/local/bin/poly"` is pointing to where your `poly` executable is installed.
