@@ -2,7 +2,7 @@ from sys import stdout
 import time
 
 import process
-from process import PolyProcess
+from process import PolyProcess, ProtocolError
 
 
 class PolyMessage:
@@ -26,17 +26,15 @@ class PolyMessage:
 
 
 class Poly:
-    def __init__(self):
+    def __init__(self, poly_bin):
         self.request_id = 0
+        self.poly_bin = poly_bin
         self.process = None
         self.compile_in_progress = False
     
     def ensure_poly_running(self):
-        if (self.process == None):
-            self.process = PolyProcess()
-        else:
-            if not self.process.is_alive():
-                self.process = PolyProcess()
+        if self.process == None or not self.process.is_alive():
+            self.process = PolyProcess(self.poly_bin)
     
     def compile(self, file, prelude, source, handler):
         if self.compile_in_progress:

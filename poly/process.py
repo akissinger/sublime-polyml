@@ -195,10 +195,16 @@ class PacketListener(Thread):
 
 
 class PolyProcess:
-    def __init__(self):
+    def __init__(self, poly_bin):
         self.request_id = 0
-        self.pipe = Popen(["/usr/local/bin/poly", "--ideprotocol"],
-            stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        
+        try:
+            self.pipe = Popen([poly_bin, "--ideprotocol"],
+                stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        except OSError:
+            raise ProtocolError('Could not run Poly/ML')
+            return None
+        
         self.listener = PacketListener(self.pipe)
         self.listener.start()
         

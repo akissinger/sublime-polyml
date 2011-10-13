@@ -41,7 +41,7 @@ class Spinner(Thread):
 class RunPolyCommand(sublime_plugin.WindowCommand):
     def __init__(self, window):
         sublime_plugin.WindowCommand.__init__(self, window)
-        self.poly = poly.Poly()
+        self.poly = None
         self.current_job = None
     
     def output(self, text):
@@ -62,41 +62,46 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
     
     def run(self):
         global spinner
+        view = self.window.active_view()
+        
+        poly_bin = view.settings().get('poly_bin')
+        if poly_bin == None: poly_bin = '/usr/local/bin/poly'
+        
+        if self.poly == None or self.poly.poly_bin != poly_bin:
+            self.poly = poly.Poly(poly_bin)
+        
         if self.current_job != None:
             print("Compile job already in progress...")
             return
         
-        view = self.window.active_view()
         view.erase_regions('poly-errors')
         
         if not hasattr(self, 'output_view'):
             self.output_view = self.window.get_output_panel("poly")
         
+        self.window.run_command("show_panel", {"panel": "output.poly"})
+        self.println("Compiling code with Poly/ML...")
         
-        working_dir = os.path.dirname(self.window.active_view().file_name())
-        file_name = os.path.basename(self.window.active_view().file_name())
+        preamble = ""
+        file_name = "--scratch--"
+        if self.window.active_view().file_name() != None:
+            working_dir = os.path.dirname(self.window.active_view().file_name())
+            file_name = os.path.basename(self.window.active_view().file_name())
+            self.output_view.settings().set("result_base_dir", working_dir)
+            
+            preamble = "OS.FileSys.chDir \"" + working_dir + "\";\n"
+            polysave = working_dir + "/.polysave/" + file_name + ".save"
+            
+            if os.path.exists(polysave):
+                preamble += "PolyML.SaveState.loadState(\"" + polysave + "\");\n"
+                preamble += "PolyML.fullGC ();\n"
 
         self.output_view.settings().set(
             "result_file_regex",
             "^(.*?):([0-9]*):.([0-9]*)-[0-9]*.:[ ](.*)$")
         
-        self.output_view.settings().set("result_base_dir", working_dir)
-        
-        self.window.run_command("show_panel", {"panel": "output.poly"})
-        self.println("Compiling code with Poly/ML...")
-        
-        preamble = "OS.FileSys.chDir \"" + working_dir + "\";\n"
-        polysave = working_dir + "/.polysave/" + file_name + ".save"
-        
-        if os.path.exists(polysave):
-            preamble += "PolyML.SaveState.loadState(\"" + polysave + "\");\n"
-            preamble += "PolyML.fullGC ();\n"
         
         ml = view.substr(sublime.Region(0, len(view)))
-        
-        if (spinner != None): spinner.stop()
-        spinner = Spinner("Compiling '{0}'".format(file_name))
-        spinner.start()
         
         def handler(code, messages):
             global spinner
@@ -127,8 +132,16 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
                     view.add_regions('poly-errors', error_regions, 'constant', sublime.DRAW_OUTLINED)
             
             sublime.set_timeout(h,0) # execute h() on the main thread
-            
-        self.current_job = self.poly.compile(view.file_name(), preamble, ml, handler)
+        
+        try:
+            self.current_job = self.poly.compile(file_name, preamble, ml, handler)
+        except poly.process.ProtocolError as e:
+            self.println("Protocol Error: " + str(e))
+            self.println("Check that 'poly_bin' is defined correctly in your user settings.")
+        else:
+            if (spinner != None): spinner.stop()
+            spinner = Spinner("Compiling '{0}'".format(file_name))
+            spinner.start()
 
 
 
