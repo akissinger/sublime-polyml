@@ -12,7 +12,7 @@ Installing
 The package can be installed by running the following commands:
 
     cd $PACKAGE_DIR
-    git clone git@github.com:akissinger/sublime-polyml.git PolyML
+    git clone git://github.com/akissinger/sublime-polyml.git PolyML
     
 Done! On OS X, `PACKAGE_DIR` is `~/Library/Application Support/Sublime Text 2/Packages/`. PolyML should show up as an option under Build Systems, and `.ML` files should highlight correctly.
 
