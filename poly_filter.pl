@@ -10,7 +10,8 @@ my $last_raw_input;
 my $filter = new RlwrapFilter;
 my $name = $filter -> name;
 $filter -> input_handler(\&expand_poly_macros);
-$filter -> echo_handler(sub {$last_raw_input}); 
+$filter -> echo_handler(sub {$last_raw_input});
+$filter -> completion_handler(\&complete);
 $filter -> run;
 
 sub expand_poly_macros {
@@ -20,3 +21,27 @@ sub expand_poly_macros {
   	$expanded =~ s/\?S(.*)/"structure Str = $1;"/e;
 	return $expanded;
 }
+
+sub complete {
+  my ($line, $word, @compl) = @_;
+  my $kw = $filter -> cloak_and_dagger(
+      "val _ = List.foldr (fn (x,_) => TextIO.print (x^\"\\n\")) () (PolyML.Compiler.signatureNames ());",
+      "> ", 200);
+  $kw .= $filter -> cloak_and_dagger(
+      "val _ = List.foldr (fn (x,_) => TextIO.print (x^\"\\n\")) () (PolyML.Compiler.structureNames ());",
+      "> ", 200);
+  $kw .= $filter -> cloak_and_dagger(
+      "val _ = List.foldr (fn (x,_) => TextIO.print (x^\"\\n\")) () (PolyML.Compiler.valueNames ());",
+      "> ", 200);
+  $kw .= $filter -> cloak_and_dagger(
+      "val _ = List.foldr (fn (x,_) => TextIO.print (x^\"\\n\")) () (PolyML.Compiler.typeNames ());",
+      "> ", 200);
+  
+  while ($kw =~ m/(($word).*)/g) {
+    my $c = $1;
+    $c =~ s/\r//g;;
+    push(@compl, $c);
+  }
+  return @compl;
+}
+

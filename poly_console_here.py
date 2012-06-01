@@ -4,12 +4,18 @@ import os
 import subprocess
 import threading
 import tempfile
+import string
 
 class ConsoleThread(threading.Thread):
-    def __init__(self,path):
+    def __init__(self,path,term):
         threading.Thread.__init__(self)
         self.working_dir = os.path.dirname(path)
         self.file_name = os.path.basename(path)
+        
+        if term == None:
+            self.term = 'xterm'
+        else:
+            self.term = term
         
     def run(self):
         (_,temp) = tempfile.mkstemp('.ML', 'poly_')
@@ -29,17 +35,27 @@ class ConsoleThread(threading.Thread):
         f.write("  PolyML.use \"%s\"\n;" % self.file_name)
         f.write("okay)) handle e => e;\n")
         f.close()
-        term = 'konsole'
-        cmd = [term,
-            "--nofork", "-e", "rlwrap",
-            "-z", sublime.packages_path() + "/PolyML/poly_filter.pl",
+        
+        cmd = [self.term]
+        poly_cmd = ["rlwrap", "-z", sublime.packages_path() + "/PolyML/poly_filter.pl",
             "poly", "--use", temp]
-        print cmd
-        subprocess.call(cmd)
-        print "done"
-        # os.remove(temp)
+        
+        if self.term == 'gnome-terminal':
+            poly_cmd = [string.join(poly_cmd, ' ')]
+            cmd += ['--disable-factory']
+        elif self.term == 'konsole':
+            cmd += ["--nofork"]
+        
+        cmd += ['-e'] + poly_cmd
+        
+        #print string.join(cmd, ' ')
+        st = subprocess.call(cmd)
+        #st = subprocess.call(['konsole','--nofork','--hold'])
+        #print ("done: %d" % st)
+        os.remove(temp)
 
 class PolyConsoleHereCommand(sublime_plugin.WindowCommand):
     def run(self):
-        ConsoleThread(self.window.active_view().file_name()).start()
+        view = self.window.active_view()
+        ConsoleThread(view.file_name(), view.settings().get('terminal')).start()
 
