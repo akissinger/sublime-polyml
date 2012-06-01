@@ -1,6 +1,10 @@
 #!/usr/bin/env perl
 
-# this filter expands some convenience macros for Poly/ML
+# This filter expands some convenience macros for Poly/ML and adds very
+# rudimentary completion for globals. To use from console, add something
+# like this to your .profile:
+#
+# alias ipoly='rlwrap -z /path/to/poly_filter.pl poly'
 
 use lib ($ENV{RLWRAP_FILTERDIR} or ".");
 use RlwrapFilter;
