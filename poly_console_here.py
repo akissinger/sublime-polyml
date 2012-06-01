@@ -5,6 +5,7 @@ import subprocess
 import threading
 import tempfile
 import string
+import time
 
 class ConsoleThread(threading.Thread):
     def __init__(self,path,term):
@@ -13,7 +14,10 @@ class ConsoleThread(threading.Thread):
         self.file_name = os.path.basename(path)
         
         if term == None:
-            self.term = 'xterm'
+            if sublime.platform() == 'linux':
+                self.term = 'xterm'
+            elif sublime.platform() == 'osx':
+                self.term = 'Terminal.app'
         else:
             self.term = term
         
@@ -41,17 +45,22 @@ class ConsoleThread(threading.Thread):
             "poly", "--use", temp]
         
         if self.term == 'gnome-terminal':
-            poly_cmd = [string.join(poly_cmd, ' ')]
-            cmd += ['--disable-factory']
+            cmd = [self.term, '--disable-factory', '-e'] + [string.join(poly_cmd, ' ')]
         elif self.term == 'konsole':
-            cmd += ["--nofork"]
+            cmd = [self.term, '--nofork'] + poly_cmd
+        elif self.term == 'Terminal.app':
+            # rlwrap needs pathname with a space in it to quoted twice
+            poly_cmd[2] = "'\\\"%s\\\"'" % poly_cmd[2]
+            cmd = ['osascript', '-e', 'tell application "Terminal"',
+                '-e', "activate",
+                '-e', "do script \"%s\"" % string.join(poly_cmd, ' '),
+                '-e', "end tell"]
+        else:
+            cmd = [self.term, '-e'] + poly_cmd
         
-        cmd += ['-e'] + poly_cmd
-        
-        #print string.join(cmd, ' ')
+        print cmd
         st = subprocess.call(cmd)
-        #st = subprocess.call(['konsole','--nofork','--hold'])
-        #print ("done: %d" % st)
+        time.sleep(10) # give poly time to load tempfile before it is removed
         os.remove(temp)
 
 class PolyConsoleHereCommand(sublime_plugin.WindowCommand):
