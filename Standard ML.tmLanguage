@@ -24,81 +24,55 @@
 		</dict>
 		<dict>
 			<key>match</key>
-			<string>\b(val|datatype|struct|as|let|in|abstype|local|where|case|of|fn|raise|exception|handle|ref|infix|infixr|before|end|structure|withtype)\b</string>
+			<string>\b(as|let|in|abstype|local|where|case|of|fn|raise|handle|ref|infix|infixr|before|end|withtype|with)\b</string>
 			<key>name</key>
 			<string>keyword.other.ml</string>
 		</dict>
+		
 		<dict>
-			<key>begin</key>
-			<string>\b(let)\b</string>
-			<key>captures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.ml</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.ml</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>\b(end)\b</string>
+			<key>match</key>
+			<string>\b(struct|sig|sharing|type|datatype|eqtype)\b</string>
 			<key>name</key>
-			<string>meta.exp.let.ml</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>include</key>
-					<string>$self</string>
-				</dict>
-			</array>
+			<string>keyword.other.ml</string>
 		</dict>
-		<dict>
-			<key>begin</key>
-			<string>\b(sig)\b</string>
-			<key>captures</key>
-			<dict>
-				<key>1</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.delimiter.ml</string>
-				</dict>
-				<key>2</key>
-				<dict>
-					<key>name</key>
-					<string>keyword.other.delimiter.ml</string>
-				</dict>
-			</dict>
-			<key>end</key>
-			<string>\b(end)\b</string>
-			<key>name</key>
-			<string>meta.module.sigdec.ml</string>
-			<key>patterns</key>
-			<array>
-				<dict>
-					<key>include</key>
-					<string>#spec</string>
-				</dict>
-			</array>
-		</dict>
+		
 		<dict>
 			<key>match</key>
 			<string>\b(if|then|else)\b</string>
 			<key>name</key>
 			<string>keyword.control.ml</string>
 		</dict>
+		
 		<dict>
-			<key>begin</key>
-			<string>\b(fun|and)\s+([\w]+)\b</string>
+			<key>match</key>
+			<string>\b(andalso|orelse|not)\b</string>
+			<key>name</key>
+			<string>keyword.operator.logical.ml</string>
+		</dict>
+		
+		<dict>
+			<key>match</key>
+			<string>\b(open)\b</string>
+			<key>name</key>
+			<string>keyword.other.module.ml</string>
+		</dict>
+		<dict>
+			<key>match</key>
+			<string>\b(nil|true|false|NONE|SOME)\b</string>
+			<key>name</key>
+			<string>constant.language.ml</string>
+		</dict>
+		
+		<dict>
+			<key>match</key>
+			<string>\b(fun|structure|signature|val|exception|functor)\s+([\w]+)\b</string>
 			<key>captures</key>
 			<dict>
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>keyword.control.fun.ml</string>
+					<!-- <string>keyword.control.fun.ml</string> -->
+					<string>storage.type.ml</string>
 				</dict>
 				<key>2</key>
 				<dict>
@@ -106,8 +80,6 @@
 					<string>entity.name.function.ml</string>
 				</dict>
 			</dict>
-			<key>end</key>
-			<string>(?=val|type|eqtype|datatype|structure|local)</string>
 			<key>name</key>
 			<string>meta.definition.fun.ml</string>
 			<key>patterns</key>
@@ -118,6 +90,14 @@
 				</dict>
 			</array>
 		</dict>
+		
+		<dict>
+			<key>match</key>
+			<string>\b(abs|app|ARRAY|Array|array|ARRAY2|Array2|ARRAY_SLICE|ArraySlice|before|BIN_IO|Bind|BinIO|BinPrimIO|BIT_FLAGS|bool|BOOL|Bool|BoolArray|BoolArray2|BoolVector|BYTE|Byte|ceil|Char|char|CHAR|CharArray|CharArray2|CharArraySlice|CharVector|CharVectorSlice|Chr|chr|CInterface|CInterfaceSig|COMMAND_LINE|CommandLine|concat|DATE|Date|Div|div|Domain|Empty|EQUAL|exn|exnMessage|exnName|explode|Fail|false|floor|foldl|foldr|GENERAL|General|GENERIC_SOCK|GenericSock|getOpt|GREATER|HashArray|hd|IEEE_REAL|IEEEReal|ignore|IMPERATIVE_IO|implode|INET_SOCK|INetSock|int|Int|Int32|INT_INF|IntArray|IntArray2|IntArraySlice|INTEGER|IntInf|IntVector|IntVectorSlice|IO|isSome|LargeInt|LargeReal|LargeWord|length|LESS|LIST|list|List|LIST_PAIR|ListPair|map|Match|MATH|Math|mod|MONO_ARRAY|MONO_ARRAY2|MONO_ARRAY_SLICE|MONO_VECTOR|MONO_VECTOR_SLICE|NET_HOST_DB|NET_PROT_DB|NET_SERV_DB|NetHostDB|NetProtDB|NetServDB|nil|NONE|not|null|o|option|OPTION|Option|ord|order|OS|OS_FILE_SYS|OS_IO|OS_PATH|OS_PROCESS|Overflow|PACK_REAL|PACK_WORD|PackRealBig|PackRealLittle|PackWord16Big|PackWord16Little|PackWord32Big|PackWord32Little|PackWord8Big|PackWord8Little|PolyML|Position|POSIX|Posix|POSIX_ERROR|POSIX_FILE_SYS|POSIX_IO|POSIX_PROC_ENV|POSIX_PROCESS|POSIX_SIGNAL|POSIX_SYS_DB|POSIX_TTY|PRIM_IO|print|Process|real|REAL|Real|RealArray|RealArray2|RealArraySlice|RealVector|RealVectorSlice|ref|rev|round|RunCall|RuntimeCalls|Signal|SIGNAL|SingleAssignment|Size|size|SML90|Socket|SOCKET|SOME|Span|str|STREAM_IO|STRING|String|string|STRING_CVT|StringCvt|Subscript|SUBSTRING|Substring|substring|SysWord|TEXT|Text|TEXT_IO|TEXT_STREAM_IO|TextIO|TextPrimIO|THREAD|Thread|ThreadLib|TIME|Time|TIMER|Timer|tl|true|trunc|unit|Universal|UniversalArray|UNIX|Unix|UNIX_SOCK|UnixSock|use|valOf|Vector|vector|VECTOR|VECTOR_SLICE|VectorSlice|WEAK|Weak|WORD|Word|word|Word32|Word8|Word8Array|Word8Array2|Word8ArraySlice|Word8Vector|Word8VectorSlice)\b</string>
+			<key>name</key>
+			<string>support.constant.ml</string>
+		</dict>
+		
 		<dict>
 			<key>begin</key>
 			<string>"</string>
@@ -170,19 +150,15 @@
 			<key>name</key>
 			<string>constant.character.ml</string>
 		</dict>
+		
 		<dict>
 			<key>match</key>
 			<string>\b\d*\.?\d+\b</string>
 			<key>name</key>
 			<string>constant.numeric.ml</string>
 		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b(andalso|orelse|not)\b</string>
-			<key>name</key>
-			<string>keyword.operator.logical.ml</string>
-		</dict>
-		<dict>
+		
+		<!-- <dict>
 			<key>begin</key>
 			<string>(?x)\b
 					(functor|structure|signature|funsig)\s+
@@ -204,20 +180,10 @@
 			<string>(?==|:|\()</string>
 			<key>name</key>
 			<string>meta.module.dec.ml</string>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b(open)\b</string>
-			<key>name</key>
-			<string>keyword.other.module.ml</string>
-		</dict>
-		<dict>
-			<key>match</key>
-			<string>\b(nil|true|false|NONE|SOME)\b</string>
-			<key>name</key>
-			<string>constant.language.ml</string>
-		</dict>
-		<dict>
+		</dict> -->
+		
+		
+		<!-- <dict>
 			<key>begin</key>
 			<string>\s*(type|eqtype) .* =</string>
 			<key>captures</key>
@@ -246,7 +212,7 @@
 					<string>meta.typeexp.ml</string>
 				</dict>
 			</array>
-		</dict>
+		</dict> -->
 	</array>
 	<key>repository</key>
 	<dict>
