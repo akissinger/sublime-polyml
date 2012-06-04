@@ -1,4 +1,5 @@
 [
     {"caption": "PolyML: Run Poly/ML on Current Buffer", "command": "run_poly"},
-    {"caption": "PolyML: Launch Poly/ML Console for Current Buffer", "command": "poly_console_here"}
+    {"caption": "PolyML: Launch Poly/ML Console for Current Buffer", "command": "poly_console_here"},
+    {"caption": "PolyML: Get Type", "command": "poly_get_type"}
 ]

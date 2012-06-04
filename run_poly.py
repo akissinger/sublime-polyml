@@ -3,40 +3,9 @@ import sublime_plugin
 import os
 import time
 import poly
+import polyio
 from threading import Thread
-
-spinner = None
-
-class Spinner(Thread):
-    def __init__(self, message):
-        Thread.__init__(self)
-        self.message = message
-        self.spin = True
-    
-    def stop(self):
-        self.spin = False
-    
-    def run(self):
-        spin_state = 0
-        state_dir = 1
-        size = 6
-        while self.spin:
-            sublime.set_timeout(lambda :
-                sublime.status_message("{0}   [{1}={2}]".format(
-                    self.message, ' ' * spin_state, ' ' * (size-spin_state)))
-            , 0)
-            
-            if spin_state == 0: state_dir = 1
-            elif spin_state == size: state_dir = -1
-            
-            spin_state += state_dir
-            time.sleep(0.1)
-        
-        sublime.set_timeout(lambda : sublime.status_message(
-            "{0}   [ done ]".format(self.message)), 0)
-            
-            
-    
+          
 
 class RunPolyCommand(sublime_plugin.WindowCommand):
     def __init__(self, window):
@@ -44,31 +13,14 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
         self.poly = None
         self.current_job = None
     
-    def output(self, text):
-        selection_was_at_end = (len(self.output_view.sel()) == 1
-            and self.output_view.sel()[0]
-                == sublime.Region(self.output_view.size()))
-        self.output_view.set_read_only(False)
-        edit = self.output_view.begin_edit()
-        self.output_view.insert(edit, self.output_view.size(), text)
-        if selection_was_at_end:
-            self.output_view.show(self.output_view.size())
-        self.output_view.end_edit(edit)
-        self.output_view.set_read_only(True)
-        
-    def println(self, text):
-        self.output(text + "\n")
-    
-    
     def run(self):
-        global spinner
         view = self.window.active_view()
         
         poly_bin = view.settings().get('poly_bin')
         if poly_bin == None: poly_bin = '/usr/local/bin/poly'
         
         if self.poly == None or self.poly.poly_bin != poly_bin:
-            self.poly = poly.Poly(poly_bin)
+            self.poly = poly.global_instance(poly_bin)
         
         if self.current_job != None:
             print("Compile job already in progress...")
@@ -76,18 +28,16 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
         
         view.erase_regions('poly-errors')
         
-        if not hasattr(self, 'output_view'):
-            self.output_view = self.window.get_output_panel("poly")
-        
-        self.window.run_command("show_panel", {"panel": "output.poly"})
-        self.println("Compiling code with Poly/ML...")
+        output_view = polyio.output_view()
+        polyio.show_output_view()
+        polyio.println("Compiling code with Poly/ML...")
         
         preamble = ""
-        file_name = "--scratch--"
-        if self.window.active_view().file_name() != None:
-            working_dir = os.path.dirname(self.window.active_view().file_name())
-            file_name = os.path.basename(self.window.active_view().file_name())
-            self.output_view.settings().set("result_base_dir", working_dir)
+        path = self.window.active_view().file_name()
+        if path != None:
+            working_dir = os.path.dirname(path)
+            file_name = os.path.basename(path)
+            output_view.settings().set("result_base_dir", working_dir)
             
             preamble = "OS.FileSys.chDir \"" + working_dir + "\";\n"
             polysave = working_dir + "/.polysave/" + file_name + ".save"
@@ -95,24 +45,30 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
             if os.path.exists(polysave):
                 preamble += "PolyML.SaveState.loadState(\"" + polysave + "\");\n"
                 preamble += "PolyML.fullGC ();\n"
+        else:
+            path = "--scratch--"
+            file_name = "--scratch--"
 
-        self.output_view.settings().set(
+        output_view.settings().set(
             "result_file_regex",
             "^(.*?):([0-9]*):.([0-9]*)-[0-9]*.:[ ](.*)$")
         
         
         ml = view.substr(sublime.Region(0, len(view)))
         
+        spinner = None
+        
         def handler(code, messages):
-            global spinner
-            spinner.stop()
+            if spinner != None:
+                polyio.stop_spinner(spinner)
+            
             self.current_job = None
             
             def h():
                 if code == 'S':
-                    self.println("[Success]\n")
+                    polyio.println("[Success]\n")
                 else:
-                    self.println("[{0}]\n".format(poly.translate_result_code(code)))
+                    polyio.println("[{0}]\n".format(poly.translate_result_code(code)))
                     
                     error_regions = []
                     
@@ -122,8 +78,8 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
                         end_col = view.rowcol(msg.end_pos)[1]
                         error_regions.append(sublime.Region(msg.start_pos, msg.end_pos))
                         
-                        self.println("{0}:{1}:({2}-{3}): {4}".format(
-                            os.path.basename(msg.filename),
+                        polyio.println("{0}:{1}:({2}-{3}): {4}".format(
+                            os.path.basename(msg.file_name),
                             line,
                             start_col + 1,
                             end_col + 1,
@@ -134,14 +90,12 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
             sublime.set_timeout(h,0) # execute h() on the main thread
         
         try:
-            self.current_job = self.poly.compile(file_name, preamble, ml, handler)
+            self.current_job = self.poly.compile(path, preamble, ml, handler)
         except poly.process.ProtocolError as e:
-            self.println("Protocol Error: " + str(e))
-            self.println("Check that 'poly_bin' is defined correctly in your user settings.")
+            polyio.println("Protocol Error: " + str(e))
+            polyio.println("Check that 'poly_bin' is defined correctly in your user settings.")
         else:
-            if (spinner != None): spinner.stop()
-            spinner = Spinner("Compiling '{0}'".format(file_name))
-            spinner.start()
+            spinner = polyio.start_spinner("Compiling '{0}'".format(file_name))
 
 
 

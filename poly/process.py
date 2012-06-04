@@ -1,5 +1,6 @@
 from subprocess import Popen, PIPE
 from collections import deque
+import threading
 from threading import Thread
 import sys
 import os
@@ -13,6 +14,10 @@ DEBUG_COLOR = False
 VTRED =    '\x1b[31;1m'
 VTGREEN =  '\x1b[32;1m'
 VTCLEAR =  '\x1b[0m'
+
+def debug(s):
+    print(s)
+    #pass
 
 class ProtocolError(Exception):
     pass
@@ -164,33 +169,33 @@ class PacketListener(Thread):
     def dispatch_packet(self, packet):
         if packet.is_response():
             rid = int(packet.tokens[1])
-            print('RID: {0}'.format(rid))
+            debug('RID: {0}'.format(rid))
             if self.response_handlers.has_key(rid):
                 handlers = self.response_handlers.pop(rid)
-                print('Handlers: {0}'.format(handlers))
+                debug('Handlers: {0}'.format(handlers))
                 for h in handlers:
                     h(packet.copy())
             else:
-                print('RID has no handlers!')
-                print(self.response_handlers)
+                debug('RID has no handlers!')
+                debug(self.response_handlers)
                 
     def run(self):
         packet = self.read_packet()
         packet.popcode('H')
-        print('Running Poly/ML, protocol version: ' + packet.popstr())
+        debug('Running Poly/ML, protocol version: ' + packet.popstr())
         packet.popcode('h')
         
         while self.listen:
             try:
-                print('Reading off excess...')
+                debug('Reading off excess...')
                 self.read_until_esc() # read off any non-protocol output
-                print('Reading packet...')
+                debug('Reading packet...')
                 packet = self.read_packet(expect_esc=False)
                 # TODO: locking
-                print('Dispatching...')
+                debug('Dispatching...')
                 self.dispatch_packet(packet)
             except ListenerKilled:
-                print('Listener killed')
+                debug('Listener killed')
                 break
 
 
@@ -211,7 +216,7 @@ class PolyProcess:
     def __del__(self):
         if self.pipe != None:
             self.listener.kill()
-            print('Closing Poly/ML')
+            debug('Closing Poly/ML')
             if self.is_alive(): self.kill()
             
     def write(self, s):
@@ -222,7 +227,33 @@ class PolyProcess:
         
     def kill(self):
         self.pipe.terminate()
-
+    
+    # send a synchronous request with a given timeout
+    def sync_request(self, code, args, timeout=2):
+        packet_ready = threading.Condition()
+        packet = []
+        
+        def h(p):
+            debug("handler called")
+            debug(repr(p))
+            
+            packet_ready.acquire()
+            packet.append(p)
+            packet_ready.notify()
+            packet_ready.release()
+        
+        packet_ready.acquire()
+        rid = self.send_request(code, args)
+        self.add_handler(rid, h)
+        packet_ready.wait(timeout)
+        packet_ready.release()
+        
+        debug("returning packet")
+        if len(packet) == 1:
+            return packet[0]
+        else:
+            return None
+    
     def send_request(self, code, args):
         request_string = '\x1b{0}{1}\x1b,{2}\x1b{3}'.format(
             code.upper(), self.request_id,
