@@ -202,6 +202,7 @@ class PacketListener(Thread):
 class PolyProcess:
     def __init__(self, poly_bin):
         self.request_id = 0
+        print ("executing '%s'" % poly_bin)
         
         try:
             self.pipe = Popen([poly_bin, "--ideprotocol"],
