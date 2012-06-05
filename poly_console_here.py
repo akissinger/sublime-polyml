@@ -10,6 +10,10 @@ import time
 class ConsoleThread(threading.Thread):
     def __init__(self,path,term):
         threading.Thread.__init__(self)
+        self.term = term
+        if self.term == None:
+            self.term = 'xterm'
+        
         self.working_dir = os.path.dirname(path)
         self.file_name = os.path.basename(path)
         
@@ -41,6 +45,7 @@ class ConsoleThread(threading.Thread):
         f.close()
         
         cmd = [self.term]
+        
         poly_cmd = ["rlwrap", "-z", sublime.packages_path() + "/PolyML/poly_filter.pl",
             "poly", "--use", temp]
         

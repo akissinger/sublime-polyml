@@ -21,8 +21,10 @@ The package provides the command 'run_poly', which can be bound to a hotkey, cal
 Configuration
 -------------
 
-At some point, I'll add some smarts so that the package can find Poly/ML on most systems. In the mean time, add the following line to your `Base File.sublime-settings`:
+At some point, I'll add some smarts so that the package can find Poly/ML on most systems. In the mean time, add the following line to your `Preferences.sublime-settings`:
 
     "poly_bin": "/usr/local/bin/poly"
 
-Where `"/usr/local/bin/poly"` is pointing to where your `poly` executable is installed.
+Where `"/usr/local/bin/poly"` is pointing to where your `poly` executable is installed. For launching Poly/ML consoles, you can set your terminal of choice using the terminal setting in Preferences. E.g.
+
+	"terminal": "konsole"
