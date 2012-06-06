@@ -2,6 +2,7 @@ from sys import stdout
 import time
 import process
 from process import PolyProcess, ProtocolError
+import accessors
 
 poly_global = None
 
