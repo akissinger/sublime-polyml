@@ -8,7 +8,7 @@ import string
 import time
 
 class ConsoleThread(threading.Thread):
-    def __init__(self,path,term):
+    def __init__(self,path,poly_bin,term):
         threading.Thread.__init__(self)
         self.term = term
         if self.term == None:
@@ -24,6 +24,11 @@ class ConsoleThread(threading.Thread):
                 self.term = 'Terminal.app'
         else:
             self.term = term
+        
+        if poly_bin == None:
+            self.poly_bin = 'poly'
+        else:
+            self.poly_bin = poly_bin
         
     def run(self):
         (_,temp) = tempfile.mkstemp('.ML', 'poly_')
@@ -47,7 +52,7 @@ class ConsoleThread(threading.Thread):
         cmd = [self.term]
         
         poly_cmd = ["rlwrap", "-z", sublime.packages_path() + "/PolyML/poly_filter.pl",
-            "poly", "--use", temp]
+            self.poly_bin, "--use", temp]
         
         if self.term == 'gnome-terminal':
             cmd = [self.term, '--disable-factory', '-e'] + [string.join(poly_cmd, ' ')]
@@ -71,5 +76,9 @@ class ConsoleThread(threading.Thread):
 class PolyConsoleHereCommand(sublime_plugin.WindowCommand):
     def run(self):
         view = self.window.active_view()
-        ConsoleThread(view.file_name(), view.settings().get('terminal')).start()
+        ConsoleThread(
+            view.file_name(),
+            view.settings().get('poly_bin'),
+            view.settings().get('terminal')
+        ).start()
 
