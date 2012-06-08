@@ -21,8 +21,9 @@ $filter -> run;
 sub expand_poly_macros {
 	my ($unexpanded) = @_;
 	my $expanded = $last_raw_input = $unexpanded;
-  	$expanded =~ s/\?s(.*)/"signature SIG = $1;"/e;
-  	$expanded =~ s/\?S(.*)/"structure Str = $1;"/e;
+  	$expanded =~ s/\?s(.*)/"signature SIG__ = $1;"/e;
+  	$expanded =~ s/\?S(.*)/"structure Str__ = $1;"/e;
+    $expanded =~ s/\?t(.*)/"PolyML.exception_trace (fn() => ( $1 ));"/e;
 	return $expanded;
 }
 
