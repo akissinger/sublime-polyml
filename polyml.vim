@@ -46,7 +46,7 @@ def poly_do_compile(path, ml):
         file_name = os.path.basename(path)
         preamble = "OS.FileSys.chDir \"" + working_dir + "\";\n"
         polysave = working_dir + "/.polysave/" + file_name + ".save"
-        
+
         if os.path.exists(polysave):
             preamble += "PolyML.SaveState.loadState(\"" + polysave + "\");\n"
             preamble += "PolyML.fullGC ();\n"
@@ -119,7 +119,47 @@ EOP
 
 endfunction
 
-au VimLeave * python poly.kill_global_instance()
+function! PolymlDescribeSymbol()
+    if !exists('g:poly_bin')
+        let g:poly_bin = 'poly'
+    endif
+python <<EOP
+def poly_describe_symbol():
+    path = vim.current.buffer.name
+    if not path:
+        print('You must save the file first')
+        return
+    lines = vim.current.buffer[:]
+    row,col = vim.current.window.cursor
+    line_start_pos = 0
+    for i in range(row-1):
+        line_start_pos += len(lines[i]) + 1
+    print("row = {0}, line_start_pos = {1}".format(row, line_start_pos))
+    poly_bin = vim.eval('g:poly_bin')
+    poly_inst = poly.global_instance(poly_bin)
+    if not poly_inst.has_built(path):
+        result = poly_do_compile(path, "\n".join(lines))[0]
+        if result != 'S':
+            print('Failed to compile')
+            return
+    print('Getting node at position {0}'.format(line_start_pos + col))
+    node = poly_inst.node_for_position(path, line_start_pos + col)
+    if node:
+        name_start = node.start - line_start_pos
+        name_end = node.end - line_start_pos
+        print('From {0} to {1}'.format(name_start, name_end))
+        name = lines[row-1][name_start:name_end]
+        ml_type = poly_inst.type_for_node(node)
+        if ml_type:
+            print('val {0} : {1}'.format(name, ml_type))
+        else:
+            print('{0} has no type'.format(name))
+    else:
+        print('Request timed out')
+poly_describe_symbol()
+EOP
+endfunction
 
+au VimLeave * python poly.kill_global_instance()
 
 " vim:sts=4:sw=4:et
