@@ -244,8 +244,7 @@ class PolyProcess:
             packet_ready.release()
         
         packet_ready.acquire()
-        rid = self.send_request(code, args)
-        self.add_handler(rid, h)
+        rid = self.send_request(code, args, h)
         packet_ready.wait(timeout)
         packet_ready.release()
         
@@ -255,10 +254,17 @@ class PolyProcess:
         else:
             return None
     
-    def send_request(self, code, args):
+    # handler is either a handler or a list of handlers
+    def send_request(self, code, args, handler = None):
         request_string = '\x1b{0}{1}\x1b,{2}\x1b{3}'.format(
             code.upper(), self.request_id,
             '\x1b,'.join([str(x) for x in args]), code.lower())
+        if handler:
+            if hasattr(handler, '__call__'):
+                self.add_handler(self.request_id, handler)
+            else:
+                for h in handler:
+                    self.add_handler(self.request_id, h)
         self.write(request_string)
         self.request_id += 1
         return (self.request_id - 1)

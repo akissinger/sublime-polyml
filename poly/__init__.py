@@ -135,13 +135,9 @@ class Poly:
         else:
             return None
 
-    def pop_compile_result(self, p, file, rid=None):
+    def pop_compile_result(self, p, file):
         p.popcode('R')  # pop off leading p code
-        if (rid):
-            if (p.popint() != rid):
-                raise ProtocolError('Bad response ID.')
-        else:
-            p.pop() # ignore RID
+        p.pop() # ignore RID
         p.popcode(',')
         self.parse_trees[file] = p.pop() # save parse tree ID
         p.popcode(',')
@@ -202,16 +198,16 @@ class Poly:
         
         self.ensure_poly_running()
         self.compile_in_progress = True
-        rid = self.process.send_request(
-                'R', [file, 0, len(prelude), len(source), prelude, source])
         
         def run_handler(p):
             self.compile_in_progress = False
-            result_code = self.pop_compile_result(p, file, rid)
+            result_code = self.pop_compile_result(p, file)
             messages = self.pop_compile_error_messages(p)
             handler(result_code, messages)
-        
-        self.process.add_handler(rid, run_handler)
+
+        self.process.send_request('R',
+                [file, 0, len(prelude), len(source), prelude, source],
+                run_handler)
         
         return rid
         
