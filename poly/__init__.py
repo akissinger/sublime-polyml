@@ -128,7 +128,7 @@ class Poly:
         else:
             return None
 
-    def pop_compile_result(self, p, rid=None):
+    def pop_compile_result(self, p, file, rid=None):
         p.popcode('R')  # pop off leading p code
         if (rid):
             if (p.popint() != rid):
@@ -184,7 +184,7 @@ class Poly:
         p = self.process.sync_request(
                 'R', [file, 0, len(prelude), len(source), prelude, source])
         self.compile_in_progress = False
-        result_code = self.pop_compile_result(p)
+        result_code = self.pop_compile_result(p, file)
         messages = self.pop_compile_error_messages(p)
         return result_code, messages
         
@@ -200,7 +200,7 @@ class Poly:
         
         def run_handler(p):
             self.compile_in_progress = False
-            result_code = self.pop_compile_result(p, rid)
+            result_code = self.pop_compile_result(p, file, rid)
             messages = self.pop_compile_error_messages(p)
             handler(result_code, messages)
         
