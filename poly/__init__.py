@@ -81,6 +81,8 @@ class Poly:
             node.file_name = path
             p = self.process.sync_request('O',
                 [self.parse_trees[path], position, position])
+            if not p:
+                return None
             p.popcode('O')
             p.pop() # ignire RID
             p.popcode(',')
@@ -99,9 +101,14 @@ class Poly:
         if 'T' in node.properties:
             p = self.process.sync_request('T',
                 [node.parse_tree, node.start, node.end])
+            if not p:
+                return None
             p.popcode('T')
-            for i in range(8): p.pop() # ignore info about the ident.
-            return p.popstr()
+            for i in range(7): p.pop() # ignore info about the ident.
+            if p.popcode().code == ',':
+                return p.popstr()
+            else:
+                return None
         else:
             return None
     
