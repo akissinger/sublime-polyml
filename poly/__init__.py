@@ -3,6 +3,7 @@ import time
 import process
 from process import PolyProcess, ProtocolError
 import accessors
+import gc
 
 poly_global = None
 
@@ -11,6 +12,12 @@ def global_instance(poly_bin='poly'):
     if poly_global == None:
         poly_global = Poly(poly_bin)
     return poly_global
+
+def kill_global_instance():
+    global poly_global
+    if poly_global != None:
+        poly_global = None
+    gc.collect()
 
 
 class PolyMessage:
