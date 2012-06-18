@@ -6,7 +6,7 @@ import accessors
 
 poly_global = None
 
-def global_instance(poly_bin='/usr/local/bin/poly'):
+def global_instance(poly_bin='poly'):
     global poly_global
     if poly_global == None:
         poly_global = Poly(poly_bin)
@@ -49,7 +49,7 @@ class PolyNode:
 
 
 class Poly:
-    def __init__(self, poly_bin='/usr/local/bin/poly'):
+    def __init__(self, poly_bin='poly'):
         self.request_id = 0
         self.poly_bin = poly_bin
         self.process = None
@@ -120,6 +120,67 @@ class Poly:
             return dnode
         else:
             return None
+
+    def pop_compile_result(self, p, rid=None):
+        p.popcode('R')  # pop off leading p code
+        if (rid):
+            if (p.popint() != rid):
+                raise ProtocolError('Bad response ID.')
+        else:
+            p.pop() # ignore RID
+        p.popcode(',')
+        self.parse_trees[file] = p.pop() # save parse tree ID
+        p.popcode(',')
+        result_code = p.popstr()
+        p.popcode(',')
+        p.popint()  # ignore final offset
+        p.popcode(';')
+        p.popempty()  # empty string between escape codes
+        return result_code
+
+    def pop_compile_error_messages(self, p):
+        messages = []
+        while p.popcode().code == 'E':
+            message_code = p.popstr()
+            p.popcode(',')
+            file_name = p.popstr()
+            p.popcode(',')
+            p.popint()  # ignore line number, seems wrong anyway
+            p.popcode(',')
+            start_pos = p.popint()
+            p.popcode(',')
+            end_pos = p.popint()
+            
+            p.popcode(';')
+            text = p.popstr()
+            code = p.popcode()
+            
+            while code.code != 'e':
+                if code.code == 'D':
+                    p.popuntilcode(';')
+                    text += p.popstr() # symbol, TODO: mark this up as a link
+                    code = p.popcode('d')
+                    text += p.popstr() # message text
+                    code = p.popcode()
+            
+            p.popempty()  # empty string between escape codes
+            
+            messages.append(PolyMessage(message_code, file_name, start_pos, end_pos, text))
+        return messages
+    
+    def compile_sync(self, file, prelude, source):
+        if self.compile_in_progress:
+            return -1
+        
+        self.ensure_poly_running()
+        self.compile_in_progress = True
+        p = self.process.sync_request(
+                'R', [file, 0, len(prelude), len(source), prelude, source])
+        self.compile_in_progress = False
+        result_code = self.pop_compile_result(p)
+        messages = self.pop_compile_error_messages(p)
+        return result_code, messages
+        
     
     def compile(self, file, prelude, source, handler):
         if self.compile_in_progress:
@@ -132,46 +193,8 @@ class Poly:
         
         def run_handler(p):
             self.compile_in_progress = False
-            p.popcode('R')  # pop off leading p code
-            if (p.popint() != rid):
-                raise ProtocolError('Bad response ID.')
-            p.popcode(',')
-            self.parse_trees[file] = p.pop() # save parse tree ID
-            p.popcode(',')
-            result_code = p.popstr()
-            p.popcode(',')
-            p.popint()  # ignore final offset
-            p.popcode(';')
-            p.popempty()  # empty string between escape codes
-            
-            messages = []
-            while p.popcode().code == 'E':
-                message_code = p.popstr()
-                p.popcode(',')
-                file_name = p.popstr()
-                p.popcode(',')
-                p.popint()  # ignore line number, seems wrong anyway
-                p.popcode(',')
-                start_pos = p.popint()
-                p.popcode(',')
-                end_pos = p.popint()
-                
-                p.popcode(';')
-                text = p.popstr()
-                code = p.popcode()
-                
-                while code.code != 'e':
-                    if code.code == 'D':
-                        p.popuntilcode(';')
-                        text += p.popstr() # symbol, TODO: mark this up as a link
-                        code = p.popcode('d')
-                        text += p.popstr() # message text
-                        code = p.popcode()
-                
-                p.popempty()  # empty string between escape codes
-                
-                messages.append(PolyMessage(message_code, file_name, start_pos, end_pos, text))
-            
+            result_code = self.pop_compile_result(p, rid)
+            messages = self.pop_compile_error_messages(p)
             handler(result_code, messages)
         
         self.process.add_handler(rid, run_handler)
@@ -192,10 +215,10 @@ def translate_result_code(code):
 
 if __name__ == '__main__':
     def test_handler(result_code, messages):
-        print(translate_result_code(result_code))
+        print('Compile (async) result: ' + translate_result_code(result_code))
         
         for msg in messages:
-            print('{0}:({1}--{2}): {3}\n'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
+            print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
     process.DEBUG = True
     
     poly = Poly()
@@ -203,10 +226,28 @@ if __name__ == '__main__':
     poly.compile('-scratch-', '', 'fun p x y = x + y\n', test_handler)
     
     time.sleep(2)
-    
+
     poly.compile('-scratch-', '', 'fun p x y = x + y\n', test_handler)
-    
+
     time.sleep(2)
+
+    print("Next compile should fail")
+    poly.compile('-scratch-', '', 'fun p y = x + y\n', test_handler)
+
+    time.sleep(2)
+
+    (result_code, messages) = poly.compile_sync('-scratch-', '', 'fun p x y = x + y\n')
+    print('Compile (sync) result: ' + translate_result_code(result_code))
+    
+    for msg in messages:
+        print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
+
+    print("Next compile should fail")
+    (result_code, messages) = poly.compile_sync('-scratch-', '', 'fun p y = x + y\n')
+    print('Compile (sync) result: ' + translate_result_code(result_code))
+    
+    for msg in messages:
+        print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
     
     del(poly)
     
