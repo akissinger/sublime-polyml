@@ -205,7 +205,7 @@ class Poly:
             messages = self.pop_compile_error_messages(p)
             handler(result_code, messages)
 
-        self.process.send_request('R',
+        rid = self.process.send_request('R',
                 [file, 0, len(prelude), len(source), prelude, source],
                 run_handler)
         
@@ -229,22 +229,25 @@ if __name__ == '__main__':
         
         for msg in messages:
             print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
-    process.DEBUG = True
+    process.DEBUG_LEVEL = 3
     
     poly = Poly()
     poly.compile('-scratch-', '', 'fun p x y = x + y\n', test_handler)
     poly.compile('-scratch-', '', 'fun p x y = x + y\n', test_handler)
     
     time.sleep(2)
+    print('\n')
 
     poly.compile('-scratch-', '', 'fun p x y = x + y\n', test_handler)
 
     time.sleep(2)
+    print('\n')
 
-    print("Next compile should fail")
+    print(">>> Next compile should fail")
     poly.compile('-scratch-', '', 'fun p y = x + y\n', test_handler)
 
     time.sleep(2)
+    print('\n')
 
     (result_code, messages) = poly.compile_sync('-scratch-', '', 'fun p x y = x + y\n')
     print('Compile (sync) result: ' + translate_result_code(result_code))
@@ -252,7 +255,9 @@ if __name__ == '__main__':
     for msg in messages:
         print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
 
-    print("Next compile should fail")
+    print('\n')
+
+    print(">>> Next compile should fail")
     (result_code, messages) = poly.compile_sync('-scratch-', '', 'fun p y = x + y\n')
     print('Compile (sync) result: ' + translate_result_code(result_code))
     

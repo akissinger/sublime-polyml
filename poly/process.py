@@ -7,7 +7,12 @@ import os
 import time
 import select
 
-DEBUG = False
+DEBUG_WARN = 1
+DEBUG_INFO = 2
+DEBUG_FINE = 3
+DEBUG_FINEST = 4
+
+DEBUG_LEVEL = 1
 DEBUG_COLOR = False
 
 # used for debug output
@@ -15,9 +20,12 @@ VTRED =    '\x1b[31;1m'
 VTGREEN =  '\x1b[32;1m'
 VTCLEAR =  '\x1b[0m'
 
-def debug(s):
-    print(s)
-    #pass
+def debug(s, level = DEBUG_INFO):
+    if DEBUG_LEVEL >= level:
+        print(s)
+
+def set_debug_level(level):
+    DEBUG_LEVEL = level
 
 class ProtocolError(Exception):
     pass
@@ -115,7 +123,7 @@ class PacketListener(Thread):
             stream = select.select([self.input],[],[],0.1)[0]
             if len(stream) == 1:
                 c = self.input.read(1)
-                if DEBUG:
+                if DEBUG_LEVEL >= DEBUG_FINEST:
                     if DEBUG_COLOR: sys.stdout.write(VTRED)
                     sys.stdout.write('['+c+']' if c!='\x1b' else '[ESC]')
                     if DEBUG_COLOR: sys.stdout.write(VTCLEAR)
@@ -169,40 +177,40 @@ class PacketListener(Thread):
     def dispatch_packet(self, packet):
         if packet.is_response():
             rid = int(packet.tokens[1])
-            debug('RID: {0}'.format(rid))
+            debug('RID: {0}'.format(rid), DEBUG_FINE)
             if self.response_handlers.has_key(rid):
                 handlers = self.response_handlers.pop(rid)
-                debug('Handlers: {0}'.format(handlers))
+                debug('Handlers: {0}'.format(handlers), DEBUG_FINE)
                 for h in handlers:
                     h(packet.copy())
             else:
-                debug('RID has no handlers!')
+                debug('RID has no handlers!', DEBUG_WARN)
                 debug(self.response_handlers)
                 
     def run(self):
         packet = self.read_packet()
         packet.popcode('H')
-        debug('Running Poly/ML, protocol version: ' + packet.popstr())
+        debug('Running Poly/ML, protocol version: ' + packet.popstr(), DEBUG_INFO)
         packet.popcode('h')
         
         while self.listen:
             try:
-                debug('Reading off excess...')
+                debug('Reading off excess...', DEBUG_FINE)
                 self.read_until_esc() # read off any non-protocol output
-                debug('Reading packet...')
+                debug('Reading packet...', DEBUG_FINE)
                 packet = self.read_packet(expect_esc=False)
                 # TODO: locking
-                debug('Dispatching...')
+                debug('Dispatching...', DEBUG_FINE)
                 self.dispatch_packet(packet)
             except ListenerKilled:
-                debug('Listener killed')
+                debug('Listener killed', DEBUG_INFO)
                 break
 
 
 class PolyProcess:
     def __init__(self, poly_bin):
         self.request_id = 0
-        print ("executing '%s'" % poly_bin)
+        debug ("executing '%s'" % poly_bin, DEBUG_INFO)
         
         try:
             self.pipe = Popen([poly_bin, "--ideprotocol"],
@@ -217,7 +225,7 @@ class PolyProcess:
     def __del__(self):
         if self.pipe != None:
             self.listener.kill()
-            debug('Closing Poly/ML')
+            debug('Closing Poly/ML', DEBUG_INFO)
             if self.is_alive(): self.kill()
             
     def write(self, s):
@@ -235,8 +243,8 @@ class PolyProcess:
         packet = []
         
         def h(p):
-            debug("handler called")
-            debug(repr(p))
+            debug("handler called", DEBUG_FINE)
+            debug(repr(p), DEBUG_FINE)
             
             packet_ready.acquire()
             packet.append(p)
@@ -248,7 +256,7 @@ class PolyProcess:
         packet_ready.wait(timeout)
         packet_ready.release()
         
-        debug("returning packet")
+        debug("returning packet", DEBUG_FINE)
         if len(packet) == 1:
             return packet[0]
         else:
