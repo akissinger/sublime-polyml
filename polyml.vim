@@ -30,6 +30,10 @@ if exists(':Polyml') != 2
     command Polyml :call Polyml()
 endif
 
+if exists(':PolymlGetType') != 2
+    command PolymlGetType :call PolymlGetType()
+endif
+
 if exists(':PolymlAccessors') != 2
     command -range=% PolymlAccessors :<line1>,<line2>python PolymlCreateAccessors()
 endif
@@ -70,7 +74,7 @@ def rowcol(lines,offset):
         i += 1
     return i,offset
 
-def poly_describe_symbol():
+def poly_get_type():
     path = vim.current.buffer.name
     if not path:
         print('You must save the file first')
@@ -80,7 +84,6 @@ def poly_describe_symbol():
     line_start_pos = 0
     for i in range(row-1):
         line_start_pos += len(lines[i]) + 1
-    print("row = {0}, line_start_pos = {1}".format(row, line_start_pos))
     poly_bin = vim.eval('g:poly_bin')
     poly_inst = poly.global_instance(poly_bin)
     if not poly_inst.has_built(path):
@@ -88,18 +91,22 @@ def poly_describe_symbol():
         if result != 'S':
             print('Failed to compile')
             return
-    print('Getting node at position {0}'.format(line_start_pos + col))
     node = poly_inst.node_for_position(path, line_start_pos + col)
     if node:
+        ml_type = poly_inst.type_for_node(node)
         name_start = node.start - line_start_pos
         name_end = node.end - line_start_pos
-        print('From {0} to {1}'.format(name_start, name_end))
-        name = lines[row-1][name_start:name_end]
-        ml_type = poly_inst.type_for_node(node)
-        if ml_type:
-            print('val {0} : {1}'.format(name, ml_type))
+        if (name_start < 0 or name_end > len(lines[row-1])):
+            if ml_type:
+                print('Expression spans multiple lines, and has type {0}'.format(ml_type))
+            else:
+                print('Expression spans multiple lines, and has no type')
         else:
-            print('{0} has no type'.format(name))
+            name = lines[row-1][name_start:name_end]
+            if ml_type:
+                print('val {0} : {1}'.format(name, ml_type))
+            else:
+                print('Expression "{0}" has no type'.format(name))
     else:
         print('Request timed out')
 EOP
@@ -136,9 +143,9 @@ else:
 
     for msg in messages:
         vim.command("call add(l:output,'{0}')".format(
-            poly_format_error(msg).replace("'","''"))
+            poly_format_error(msg).replace("'","''")))
 
-# allow GC to work
+# Garbage collection
 del lines
 del result
 del messages
@@ -166,11 +173,11 @@ EOP
 
 endfunction
 
-function! PolymlDescribeSymbol()
+function! PolymlGetType()
     if !exists('g:poly_bin')
         let g:poly_bin = 'poly'
     endif
-    python poly_describe_symbol()
+    python poly_get_type()
 endfunction
 
 function! s:get_visual_selection()
