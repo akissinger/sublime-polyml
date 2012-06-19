@@ -86,7 +86,7 @@ def struct_for_record(rec_str):
 
 	return out
 
-if __name__ == '__main__':
+def run_tests():
 	# a typical record
 	record = """
 	  datatype T = MatchState of {
@@ -108,6 +108,10 @@ if __name__ == '__main__':
 	    ps_nodeverts : V.NSet.T
 	  }
 	"""
+	
+	print(sig_for_record(record))
+	print(struct_for_record(record))
 
-	print sig_for_record(record)
-	print struct_for_record(record)
+if __name__ == '__main__':
+    run_tests()
+

@@ -33,6 +33,9 @@ class ProtocolError(Exception):
 class ListenerKilled(Exception):
     pass
 
+class Timeout(Exception):
+    pass
+
 class EscCode:
     def __init__(self, code):
         self.code = code
@@ -170,7 +173,7 @@ class PacketListener(Thread):
         return packet
 
     def add_handler(self, rid, h):
-        if not self.response_handlers.has_key(rid):
+        if not (rid in self.response_handlers):
             self.response_handlers[rid] = []
         self.response_handlers[rid].append(h)
 
@@ -178,7 +181,7 @@ class PacketListener(Thread):
         if packet.is_response():
             rid = int(packet.tokens[1])
             debug('RID: {0}'.format(rid), DEBUG_FINE)
-            if self.response_handlers.has_key(rid):
+            if rid in self.response_handlers:
                 handlers = self.response_handlers.pop(rid)
                 debug('Handlers: {0}'.format(handlers), DEBUG_FINE)
                 for h in handlers:
@@ -261,7 +264,8 @@ class PolyProcess:
         if len(packet) == 1:
             return packet[0]
         else:
-            return None
+            debug("Request timed out", DEBUG_INFO)
+            raise Timeout()
 
     # handler is either a handler or a list of handlers
     def send_request(self, code, args, handler = None):
