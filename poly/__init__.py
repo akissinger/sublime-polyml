@@ -178,18 +178,22 @@ class Poly:
             messages.append(PolyMessage(message_code, file_name, start_pos, end_pos, text))
         return messages
     
-    def compile_sync(self, file, prelude, source):
+    def compile_sync(self, file, prelude, source, timeout=10):
         if self.compile_in_progress:
             return -1
         
         self.ensure_poly_running()
         self.compile_in_progress = True
-        p = self.process.sync_request(
-                'R', [file, 0, len(prelude), len(source), prelude, source])
+        p = self.process.sync_request('R',
+                                      [file, 0, len(prelude), len(source), prelude, source],
+                                      timeout)
         self.compile_in_progress = False
-        result_code = self.pop_compile_result(p, file)
-        messages = self.pop_compile_error_messages(p)
-        return result_code, messages
+        if p:
+            result_code = self.pop_compile_result(p, file)
+            messages = self.pop_compile_error_messages(p)
+            return result_code, messages
+        else:
+            return '!Timeout',[]
         
     
     def compile(self, file, prelude, source, handler):
@@ -221,6 +225,7 @@ def translate_result_code(code):
         elif code == 'L': return 'Error or exception in ML prelude'
         elif code == 'F': return 'Parse/typecheck error'
         elif code == 'C': return 'Compilation cancelled'
+        elif code == '!Timeout': return 'Request timed out'
 
 
 if __name__ == '__main__':

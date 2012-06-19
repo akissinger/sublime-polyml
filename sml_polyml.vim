@@ -8,15 +8,19 @@
 "   Drop sml_polyml.vim and the poly/ directory into ~/.vim/ftplugin
 "
 " Usage:
-"   :Polyml
+"   :Polyml [timeout]
 "   Compile the current file. There is no need to save first, although
-"   QuickFix lists don't work well with unnamed buffers.
+"   QuickFix lists don't work well with unnamed buffers.  The timeout is
+"   in seconds.
+"
 "   Auto-opening the QuickFix window on errors can be disabled with
 "       let g:polyml_cwindow = 0
+"
 "
 "   :PolymlGetType
 "   Gets the type of the expression under the cursor.  If you have edited the
 "   file since the last compile, you should re-compile it with :Polyml first.
+"
 "
 "   :[range]PolymlAccessors
 "   Generates accessor declarations for a datatype, as selected by [range].
@@ -38,7 +42,7 @@ if !exists('g:polyml_accessor_buffer_name')
 endif
 
 if exists(':Polyml') != 2
-    command Polyml :call Polyml()
+    command -nargs=? Polyml :call Polyml(<args>)
 endif
 
 if exists(':PolymlGetType') != 2
@@ -58,7 +62,7 @@ import poly
 # The main reason this is a function is to scope poly_inst properly.
 # Otherwise, the Poly object won't be garbage collected, and vim will
 # hang at exit waiting for the various Python threads to return.
-def poly_do_compile(path, ml):
+def poly_do_compile(path, ml, timeout):
     poly_bin = vim.eval('g:poly_bin')
     poly_inst = poly.global_instance(poly_bin)
 
@@ -76,7 +80,7 @@ def poly_do_compile(path, ml):
     else:
         path = '--scratch--'
 
-    return poly_inst.compile_sync(path, preamble, ml)
+    return poly_inst.compile_sync(path, preamble, ml, timeout)
 
 def rowcol(lines,offset):
     i = 0
@@ -98,7 +102,7 @@ def poly_get_type():
     poly_bin = vim.eval('g:poly_bin')
     poly_inst = poly.global_instance(poly_bin)
     if not poly_inst.has_built(path):
-        result = poly_do_compile(path, "\n".join(lines))[0]
+        result = poly_do_compile(path, "\n".join(lines), 5)[0]
         if result != 'S':
             print('Failed to compile')
             return
@@ -122,15 +126,19 @@ def poly_get_type():
         print('Request timed out')
 EOP
 
-function! Polyml()
+function! Polyml(...)
     if !exists('g:poly_bin')
         let g:poly_bin = 'poly'
     endif
     let l:output = []
     let l:success = 0
+    let l:timeout = 10
+    if a:0 > 0
+        let l:timeout = a:000[0]
+    endif
 python <<EOP
 lines = vim.current.buffer[:]
-(result,messages) = poly_do_compile(vim.current.buffer.name, "\n".join(lines))
+(result,messages) = poly_do_compile(vim.current.buffer.name, "\n".join(lines), int(vim.eval('l:timeout')))
 
 def poly_format_error(msg):
         line,start_col = rowcol(lines,msg.start_pos)

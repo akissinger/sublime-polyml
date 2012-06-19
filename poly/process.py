@@ -238,6 +238,7 @@ class PolyProcess:
         self.pipe.terminate()
     
     # send a synchronous request with a given timeout
+    # returns None on timeout
     def sync_request(self, code, args, timeout=2):
         packet_ready = threading.Condition()
         packet = []
