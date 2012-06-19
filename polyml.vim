@@ -22,8 +22,16 @@ if !exists('g:polyml_cwindow')
     let g:polyml_cwindow = 1
 endif
 
+if !exists('g:polyml_accessor_buffer_name')
+    let g:polyml_accessor_buffer_name = '__poly_accessors__'
+endif
+
 if exists(':Polyml') != 2
     command Polyml :call Polyml()
+endif
+
+if exists(':PolymlAccessors') != 2
+    command -range=% PolymlAccessors :<line1>,<line2>python PolymlCreateAccessors()
 endif
 
 python <<EOP
@@ -61,69 +69,7 @@ def rowcol(lines,offset):
         offset -= len(lines[i]) + 1
         i += 1
     return i,offset
-EOP
 
-function! Polyml()
-    if !exists('g:poly_bin')
-        let g:poly_bin = 'poly'
-    endif
-    let l:output = []
-    let l:success = 0
-python <<EOP
-cb = vim.current.buffer
-lines = cb[:]
-path = cb.name
-(result,messages) = poly_do_compile(path, "\n".join(lines))
-
-if result == 'S':
-    vim.command("let l:success = 1")
-else:
-    vim.command("let l:output = ['{0}']".format(poly.translate_result_code(result)))
-
-    for msg in messages:
-        line,start_col = rowcol(lines,msg.start_pos)
-        end_col = rowcol(lines,msg.end_pos)[1]
-        if msg.file_name == '--scratch--':
-            file_name = ''
-        else:
-            file_name = os.path.basename(msg.file_name)
-
-        vim.command("call add(l:output,'{0}:{1}:{2}-{3}: {4}')".format(
-            file_name,
-            line + 1,
-            start_col + 1,
-            end_col + 1,
-            msg.text.rstrip().replace("'","''")))
-
-EOP
-
-    if l:success
-        echo 'Success!'
-        silent cexpr! ['Success']
-        if g:polyml_cwindow
-            cclose
-        endif
-    else
-        " Vim uses the global errorformat for cexpr, not the local one
-        let l:efm_save = &g:errorformat
-        " the second part matches results from unnamed buffers, but in
-        " this case vim cannot jump to the correct position in the file
-        setglobal errorformat=%f:%l:%c-%*[0-9]:\ %m,:%l:%c-%*[0-9]:\ %m
-        silent cexpr! l:output
-        let &g:errorformat = l:efm_save
-
-        if g:polyml_cwindow
-            copen
-        endif
-    endif
-
-endfunction
-
-function! PolymlDescribeSymbol()
-    if !exists('g:poly_bin')
-        let g:poly_bin = 'poly'
-    endif
-python <<EOP
 def poly_describe_symbol():
     path = vim.current.buffer.name
     if not path:
@@ -156,9 +102,126 @@ def poly_describe_symbol():
             print('{0} has no type'.format(name))
     else:
         print('Request timed out')
-poly_describe_symbol()
 EOP
+
+function! Polyml()
+    if !exists('g:poly_bin')
+        let g:poly_bin = 'poly'
+    endif
+    let l:output = []
+    let l:success = 0
+python <<EOP
+lines = vim.current.buffer[:]
+(result,messages) = poly_do_compile(vim.current.buffer.name, "\n".join(lines))
+
+def poly_format_error(msg):
+        line,start_col = rowcol(lines,msg.start_pos)
+        end_col = rowcol(lines,msg.end_pos)[1]
+        if msg.file_name == '--scratch--':
+            file_name = ''
+        else:
+            file_name = os.path.basename(msg.file_name)
+
+        return "{0}:{1}:{2}-{3}: {4}".format(
+            file_name,
+            line + 1,
+            start_col + 1,
+            end_col + 1,
+            msg.text.rstrip())
+
+if result == 'S':
+    vim.command("let l:success = 1")
+else:
+    vim.command("let l:output = ['{0}']".format(poly.translate_result_code(result)))
+
+    for msg in messages:
+        vim.command("call add(l:output,'{0}')".format(
+            poly_format_error(msg).replace("'","''"))
+
+# allow GC to work
+del lines
+del result
+del messages
+EOP
+
+    if l:success
+        echo 'Success!'
+        silent cexpr! ['Success']
+        if g:polyml_cwindow
+            cclose
+        endif
+    else
+        " Vim uses the global errorformat for cexpr, not the local one
+        let l:efm_save = &g:errorformat
+        " the second part matches results from unnamed buffers, but in
+        " this case vim cannot jump to the correct position in the file
+        setglobal errorformat=%f:%l:%c-%*[0-9]:\ %m,:%l:%c-%*[0-9]:\ %m
+        silent cexpr! l:output
+        let &g:errorformat = l:efm_save
+
+        if g:polyml_cwindow
+            copen
+        endif
+    endif
+
 endfunction
+
+function! PolymlDescribeSymbol()
+    if !exists('g:poly_bin')
+        let g:poly_bin = 'poly'
+    endif
+    python poly_describe_symbol()
+endfunction
+
+function! s:get_visual_selection()
+    let [lnum1, col1] = getpos("'<")[1:2]
+    let [lnum2, col2] = getpos("'>")[1:2]
+    let lines = getline(lnum1, lnum2)
+    let lines[-1] = lines[-1][: col2 - 2]
+    let lines[0] = lines[0][col1 - 1:]
+    return join(lines, "\n")
+endfunction
+
+function! Poly_get_accessor_buffer()
+    let l:scr_bufnum = bufnr(g:polyml_accessor_buffer_name)
+    if l:scr_bufnum == -1
+        " open a new scratch buffer
+        exe "new " . g:polyml_accessor_buffer_name
+        let l:scr_bufnum = bufnr(g:polyml_accessor_buffer_name)
+    else
+        " Scratch buffer is already created. Check whether it is open
+        " in one of the windows
+        let l:scr_winnum = bufwinnr(l:scr_bufnum)
+        if l:scr_winnum != -1
+            " Jump to the window which has the scratch buffer if we are not
+            " already in that window
+            if winnr() != l:scr_winnum
+                exe l:scr_winnum . "wincmd w"
+            endif
+        else
+            " Create a new scratch buffer
+            exe "split +buffer" . l:scr_bufnum
+        endif
+    endif
+    setlocal buftype=nofile
+    setlocal bufhidden=delete
+    setlocal noswapfile
+    setlocal nobuflisted
+    return l:scr_bufnum
+endfunction
+
+python <<EOP
+def PolymlCreateAccessors():
+    if len(vim.current.range) == 0:
+        vim.command("echo 'No range given'")
+        return
+    accessors = poly.accessors.sig_for_record("\n".join(vim.current.range[:]))
+    if not accessors:
+        vim.command("echo 'Range is not a record'")
+        return
+    bufidx = int(vim.eval('Poly_get_accessor_buffer()')) - 1
+    vim.buffers[bufidx][:] = accessors.split('\n')
+EOP
 
 au VimLeave * python poly.kill_global_instance()
 
