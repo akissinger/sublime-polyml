@@ -5,7 +5,7 @@
 " Contributors:
 "
 " Installation:
-"   Drop sml-polyml.vim and the poly/ directory into ~/.vim/ftplugin
+"   Drop sml_polyml.vim and the poly/ directory into ~/.vim/ftplugin
 "
 " Usage:
 "   :Polyml
