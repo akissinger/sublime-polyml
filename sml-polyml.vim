@@ -1,16 +1,27 @@
 " Poly/ML integration
 " Maintainer:   Alex Merry <dev@randomguy3.me.uk>
-" Last Change:  2012 Jun 18
+" Last Change:  2012 Jun 19
 " Version:      0.1
 " Contributors:
 "
+" Installation:
+"   Drop sml-polyml.vim and the poly/ directory into ~/.vim/ftplugin
+"
 " Usage:
-"   Run :Polyml to compile the current file (no need to save first, although
-"   QuickFix lists don't work well with unnamed files).
-"
+"   :Polyml
+"   Compile the current file. There is no need to save first, although
+"   QuickFix lists don't work well with unnamed buffers.
 "   Auto-opening the QuickFix window on errors can be disabled with
-"
 "       let g:polyml_cwindow = 0
+"
+"   :PolymlGetType
+"   Gets the type of the expression under the cursor.  If you have edited the
+"   file since the last compile, you should re-compile it with :Polyml first.
+"
+"   :[range]PolymlAccessors
+"   Generates accessor declarations for a datatype, as selected by [range].
+"   The usual use is to visually highlight (with V) the datatype declaration,
+"   and then call :'<,'>PolymlAccessors
 "
 
 if !has('python')
