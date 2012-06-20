@@ -66,7 +66,6 @@ def poly_do_compile(path, ml, timeout):
     poly_bin = vim.eval('g:poly_bin')
     poly_inst = poly.global_instance(poly_bin)
 
-    print('Compiling code with Poly/ML...')
     preamble = ''
     if (path):
         working_dir = os.path.dirname(path)
@@ -92,7 +91,7 @@ def rowcol(lines,offset):
 def poly_get_type():
     path = vim.current.buffer.name
     if not path:
-        print('You must save the file first')
+        vim.command('echo "You must save and compile the file first!"')
         return
     lines = vim.current.buffer[:]
     row,col = vim.current.window.cursor
@@ -102,28 +101,70 @@ def poly_get_type():
     poly_bin = vim.eval('g:poly_bin')
     poly_inst = poly.global_instance(poly_bin)
     if not poly_inst.has_built(path):
-        result = poly_do_compile(path, "\n".join(lines), 5)[0]
-        if result != 'S':
-            print('Failed to compile')
-            return
-    node = poly_inst.node_for_position(path, line_start_pos + col)
-    if node:
-        ml_type = poly_inst.type_for_node(node)
-        name_start = node.start - line_start_pos
-        name_end = node.end - line_start_pos
-        if (name_start < 0 or name_end > len(lines[row-1])):
-            if ml_type:
-                print('Expression spans multiple lines, and has type {0}'.format(ml_type))
+        vim.command('echo "You must compile the file first!"')
+        return
+    try:
+        node = poly_inst.node_for_position(path, line_start_pos + col)
+        if node:
+            ml_type = poly_inst.type_for_node(node)
+            name_start = node.start - line_start_pos
+            name_end = node.end - line_start_pos
+            if (name_start < 0 or name_end > len(lines[row-1])):
+                if ml_type:
+                    vim.command('echo "Expression spans multiple lines, and has type {0}"'.format(ml_type.replace("'","''")))
+                else:
+                    vim.command('echo "Expression spans multiple lines, and has no type"')
             else:
-                print('Expression spans multiple lines, and has no type')
+                name = lines[row-1][name_start:name_end]
+                if ml_type:
+                    vim.command('echo "val {0} : {1}"'.format(name.replace("'","''"), ml_type.replace("'","''")))
+                else:
+                    vim.command("echo 'Expression \"{0}\" has no type'".format(name.replace("'","''")))
         else:
-            name = lines[row-1][name_start:name_end]
-            if ml_type:
-                print('val {0} : {1}'.format(name, ml_type))
+            vim.command('echo "Failed to find parse tree location"')
+    except poly.process.Timeout:
+        vim.command('echo "Request timed out"')
+
+def poly_format_message(msg):
+        if msg.message_code == 'E':
+            mtype = 'Error: '
+        elif msg.message_code == 'W':
+            mtype = 'Warning: '
+        elif msg.message_code == 'X':
+            mtype = 'Exception: '
+        else:
+            mtype = ''
+
+        if not msg.location:
+            return mtype + msg.text
+        else:
+            if msg.location.file_name == '--scratch--':
+                file_name = ''
             else:
-                print('Expression "{0}" has no type'.format(name))
-    else:
-        print('Request timed out')
+                file_name = os.path.basename(msg.location.file_name)
+
+            if msg.location.line:
+                line = msg.location.line
+                start_col = msg.location.start
+                end_col = msg.location.end
+            else:
+                # try to find the right buffer
+                bufidx = int(vim.eval("bufnr('{0}')".format(file_name.replace("'","''")))) - 1
+                if bufidx >= 0:
+                    lines = vim.buffers[bufidx][:]
+                else:
+                    # guess at the current buffer
+                    lines = vim.current.buffer[:]
+                line,start_col = rowcol(lines,msg.location.start)
+                end_col = rowcol(lines,msg.location.end)[1]
+
+            return "{0}:{1}:{2}-{3}: {5}{4}".format(
+                file_name,
+                line + 1,
+                start_col + 1,
+                end_col + 1,
+                msg.text,
+                mtype)
 EOP
 
 function! Polyml(...)
@@ -136,47 +177,33 @@ function! Polyml(...)
     if a:0 > 0
         let l:timeout = a:000[0]
     endif
+    redraw
+    echo "Compiling code with Poly/ML..."
 python <<EOP
-lines = vim.current.buffer[:]
-(result,messages) = poly_do_compile(vim.current.buffer.name, "\n".join(lines), int(vim.eval('l:timeout')))
 
-def poly_format_error(msg):
-        line,start_col = rowcol(lines,msg.start_pos)
-        end_col = rowcol(lines,msg.end_pos)[1]
-        if msg.file_name == '--scratch--':
-            file_name = ''
-        else:
-            file_name = os.path.basename(msg.file_name)
+try:
+    (result,messages) = poly_do_compile(vim.current.buffer.name,
+                                        "\n".join(vim.current.buffer[:]),
+                                        int(vim.eval('l:timeout')))
 
-        return "{0}:{1}:{2}-{3}: {4}".format(
-            file_name,
-            line + 1,
-            start_col + 1,
-            end_col + 1,
-            msg.text.rstrip())
-
-if result == 'S':
+    hr_result = poly.translate_result_code(result)
     vim.command("let l:success = 1")
-else:
-    vim.command("let l:output = ['{0}']".format(poly.translate_result_code(result)))
+    vim.command("let l:result = '{0}'".format(hr_result.replace("'","''")))
+    vim.command("let l:output = [l:result]".format(hr_result))
 
     for msg in messages:
         vim.command("call add(l:output,'{0}')".format(
-            poly_format_error(msg).replace("'","''")))
+            poly_format_message(msg).replace("'","''")))
 
-# Garbage collection
-del lines
-del result
-del messages
+    del result
+    del messages
+except poly.process.Timeout:
+    vim.command('echo "Communication with Poly/ML timed out"')
 EOP
 
     if l:success
-        echo 'Success!'
-        silent cexpr! ['Success']
-        if g:polyml_cwindow
-            cclose
-        endif
-    else
+        redraw
+        echo l:result
         " Vim uses the global errorformat for cexpr, not the local one
         let l:efm_save = &g:errorformat
         " the second part matches results from unnamed buffers, but in
@@ -185,11 +212,15 @@ EOP
         silent cexpr! l:output
         let &g:errorformat = l:efm_save
 
-        if g:polyml_cwindow
+        if g:polyml_cwindow && len(l:output) > 1
             copen
+        else
+            cclose
         endif
+    else
+        redraw
+        echo ''
     endif
-
 endfunction
 
 function! PolymlGetType()
@@ -250,5 +281,7 @@ def PolymlCreateAccessors():
 EOP
 
 au VimLeave * python poly.kill_global_instance()
+
+map <silent> <F5> :Polyml<CR>
 
 " vim:sts=4:sw=4:et
