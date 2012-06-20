@@ -27,7 +27,7 @@ class PolyMessage:
         self.start_pos = int(start_pos)
         self.end_pos = int(end_pos)
         self.text = text
-        
+
     def __str__(self):
         return "{0} '{1}' ({2}-{3}): {4}".format(
             'Error' if self.message_code == 'E' else 'Warning',
@@ -35,7 +35,7 @@ class PolyMessage:
             self.start_pos,
             self.end_pos,
             self.text)
-    
+
     def __repr__(self):
         return repr(self.__str__())
 
@@ -62,19 +62,19 @@ class Poly:
         self.process = None
         self.compile_in_progress = False
         self.parse_trees = {}
-    
+
     def has_built(self, path):
         return (path in self.parse_trees.keys())
-    
+
     def ensure_poly_running(self):
         if self.process == None or not self.process.is_alive():
             self.process = PolyProcess(self.poly_bin)
-    
+
     def print_info_about_symbol(self, file, offset):
         self.ensure_poly_running()
         # rid = self.process.send_request(
         #         'O', [file, ])
-    
+
     def node_for_position(self, path, position):
         if path in self.parse_trees.keys():
             node = PolyNode()
@@ -96,7 +96,7 @@ class Poly:
             return node
         else:
             return None
-    
+
     def type_for_node(self, node):
         if 'T' in node.properties:
             p = self.process.sync_request('T',
@@ -111,13 +111,13 @@ class Poly:
                 return None
         else:
             return None
-    
+
     def declaration_for_node(self, node):
         if 'I' in node.properties:
             dnode = PolyNode()
             p = self.process.sync_request('I',
                 [node.parse_tree, node.start, node.end])
-            
+
             p.popcode('I')
             for i in range(8): p.pop() # ignore info about the ident.
             dnode.file_name = p.popstr()
@@ -127,10 +127,10 @@ class Poly:
             dnode.start = p.popint()
             p.popcode(',')
             dnode.end = p.popint()
-            
+
             if dnode.file_name in self.parse_trees.keys():
                 dnode.parse_tree = self.parse_trees[dnode.file_name]
-            
+
             return dnode
         else:
             return None
@@ -160,11 +160,11 @@ class Poly:
             start_pos = p.popint()
             p.popcode(',')
             end_pos = p.popint()
-            
+
             p.popcode(';')
             text = p.popstr()
             code = p.popcode()
-            
+
             while code.code != 'e':
                 if code.code == 'D':
                     p.popuntilcode(';')
@@ -172,16 +172,16 @@ class Poly:
                     code = p.popcode('d')
                     text += p.popstr() # message text
                     code = p.popcode()
-            
+
             p.popempty()  # empty string between escape codes
-            
+
             messages.append(PolyMessage(message_code, file_name, start_pos, end_pos, text))
         return messages
-    
+
     def compile_sync(self, file, prelude, source, timeout=10):
         if self.compile_in_progress:
             return -1
-        
+
         self.ensure_poly_running()
         self.compile_in_progress = True
         p = self.process.sync_request('R',
@@ -194,15 +194,15 @@ class Poly:
             return result_code, messages
         else:
             return '!Timeout',[]
-        
-    
+
+
     def compile(self, file, prelude, source, handler):
         if self.compile_in_progress:
             return -1
-        
+
         self.ensure_poly_running()
         self.compile_in_progress = True
-        
+
         def run_handler(p):
             self.compile_in_progress = False
             result_code = self.pop_compile_result(p, file)
@@ -212,12 +212,12 @@ class Poly:
         rid = self.process.send_request('R',
                 [file, 0, len(prelude), len(source), prelude, source],
                 run_handler)
-        
+
         return rid
-        
+
     def cancel_compile(self, rid):
         self.process.send_request('K', [rid])
-        
+
 
 def translate_result_code(code):
         if code == 'S': return 'Success'
@@ -231,15 +231,15 @@ def translate_result_code(code):
 if __name__ == '__main__':
     def test_handler(result_code, messages):
         print('Compile (async) result: ' + translate_result_code(result_code))
-        
+
         for msg in messages:
             print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
     process.DEBUG_LEVEL = 3
-    
+
     poly = Poly()
     poly.compile('-scratch-', '', 'fun p x y = x + y\n', test_handler)
     poly.compile('-scratch-', '', 'fun p x y = x + y\n', test_handler)
-    
+
     time.sleep(2)
     print('\n')
 
@@ -256,7 +256,7 @@ if __name__ == '__main__':
 
     (result_code, messages) = poly.compile_sync('-scratch-', '', 'fun p x y = x + y\n')
     print('Compile (sync) result: ' + translate_result_code(result_code))
-    
+
     for msg in messages:
         print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
 
@@ -265,11 +265,11 @@ if __name__ == '__main__':
     print(">>> Next compile should fail")
     (result_code, messages) = poly.compile_sync('-scratch-', '', 'fun p y = x + y\n')
     print('Compile (sync) result: ' + translate_result_code(result_code))
-    
+
     for msg in messages:
         print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
-    
+
     del(poly)
-    
-    
+
+
 

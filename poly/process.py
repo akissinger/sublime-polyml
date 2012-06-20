@@ -29,27 +29,27 @@ def set_debug_level(level):
 
 class ProtocolError(Exception):
     pass
-    
+
 class ListenerKilled(Exception):
     pass
 
 class EscCode:
     def __init__(self, code):
         self.code = code
-    
+
     def __repr__(self):
         return 'ESC[' + self.code + ']'
 
 class Packet:
     def __init__(self, initial=[]):
         self.tokens = deque(initial)
-    
+
     def copy(self):
         return Packet(self.tokens)
-    
+
     def append(self, token):
         self.tokens.append(token)
-    
+
     def is_response(self):
         # M is currently unimplemented, as it doesn't provide a request-id
         if self.tokens[0].__class__ == EscCode:
@@ -60,10 +60,10 @@ class Packet:
                     self.tokens[0].code == 'T')
         else:
             raise ProtocolError("Malformed packet.")
-        
+
     def pop(self):
         return self.tokens.popleft()
-    
+
     def popint(self):
         val = self.tokens.popleft()
         try:
@@ -73,14 +73,14 @@ class Packet:
             return intval
         except ValueError:
             raise ProtocolError("Expected int, got: {0}".format(repr(val)))
-    
+
     def popstr(self):
         val = self.tokens.popleft()
         if (val.__class__ != EscCode):
             return val
         else:
             raise ProtocolError("Expected string, got: {0}".format(repr(val)))
-    
+
     def popcode(self, code=None):
         val = self.tokens.popleft()
         if code == None:
@@ -93,13 +93,13 @@ class Packet:
                 return val
             else:
                 raise ProtocolError("Expected code '{0}', got: {1}".format(code, repr(val)))
-            
-    
+
+
     def popempty(self):
         val = self.tokens.popleft()
         if (val != ''):
             raise ProtocolError("Expected '', got {0}".format(repr(val)))
-            
+
     def popuntilcode(self, code):
         while len(self.tokens) != 0:
             val = self.pop()
@@ -113,10 +113,10 @@ class PacketListener(Thread):
         #self.pipe = poly_pipe
         self.response_handlers = {}
         self.listen = True
-    
+
     def kill(self):
         self.listen = False
-        
+
     def read1(self):
         c = None
         while self.listen:
@@ -131,13 +131,13 @@ class PacketListener(Thread):
         if c == '': self.kill() # empty string means we hit EOF
         if self.listen == False: raise ListenerKilled()
         return c
-    
+
     def read_until_esc(self):
         c = self.read1()
         while (c != '\x1b'):
             #sys.stdout.write(c)
             c = self.read1()
-        
+
     def read_packet(self, expect_esc=True):
         packet = Packet()
         escape = False
@@ -147,10 +147,10 @@ class PacketListener(Thread):
             code = self.read1()
         else:
             code = c
-        
+
         packet.append(EscCode(code))
         buf = ''
-        
+
         c = self.read1()
         while True:
             if escape:  # previous character was an escape
@@ -161,19 +161,19 @@ class PacketListener(Thread):
                 escape = False
             else:
                 buf += c
-            
+
             c = self.read1()
             if c == '\x1b':
                 escape = True
                 c = self.read1()
-                
+
         return packet
-    
+
     def add_handler(self, rid, h):
         if not self.response_handlers.has_key(rid):
             self.response_handlers[rid] = []
         self.response_handlers[rid].append(h)
-    
+
     def dispatch_packet(self, packet):
         if packet.is_response():
             rid = int(packet.tokens[1])
@@ -186,13 +186,13 @@ class PacketListener(Thread):
             else:
                 debug('RID has no handlers!', DEBUG_WARN)
                 debug(self.response_handlers)
-                
+
     def run(self):
         packet = self.read_packet()
         packet.popcode('H')
         debug('Running Poly/ML, protocol version: ' + packet.popstr(), DEBUG_INFO)
         packet.popcode('h')
-        
+
         while self.listen:
             try:
                 debug('Reading off excess...', DEBUG_FINE)
@@ -211,58 +211,58 @@ class PolyProcess:
     def __init__(self, poly_bin):
         self.request_id = 0
         debug ("executing '%s'" % poly_bin, DEBUG_INFO)
-        
+
         try:
             self.pipe = Popen([poly_bin, "--ideprotocol"],
                 stdin=PIPE, stdout=PIPE, stderr=PIPE)
         except OSError:
             raise ProtocolError('Could not run Poly/ML')
             return None
-        
+
         self.listener = PacketListener(self.pipe)
         self.listener.start()
-        
+
     def __del__(self):
         if self.pipe != None:
             self.listener.kill()
             debug('Closing Poly/ML', DEBUG_INFO)
             if self.is_alive(): self.kill()
-            
+
     def write(self, s):
         self.pipe.stdin.write(s)
 
     def is_alive(self):
         return (self.pipe.poll() == None)
-        
+
     def kill(self):
         self.pipe.terminate()
-    
+
     # send a synchronous request with a given timeout
     # returns None on timeout
     def sync_request(self, code, args, timeout=2):
         packet_ready = threading.Condition()
         packet = []
-        
+
         def h(p):
             debug("handler called", DEBUG_FINE)
             debug(repr(p), DEBUG_FINE)
-            
+
             packet_ready.acquire()
             packet.append(p)
             packet_ready.notify()
             packet_ready.release()
-        
+
         packet_ready.acquire()
         rid = self.send_request(code, args, h)
         packet_ready.wait(timeout)
         packet_ready.release()
-        
+
         debug("returning packet", DEBUG_FINE)
         if len(packet) == 1:
             return packet[0]
         else:
             return None
-    
+
     # handler is either a handler or a list of handlers
     def send_request(self, code, args, handler = None):
         request_string = '\x1b{0}{1}\x1b,{2}\x1b{3}'.format(
@@ -277,7 +277,7 @@ class PolyProcess:
         self.write(request_string)
         self.request_id += 1
         return (self.request_id - 1)
-        
+
     def add_handler(self, rid, h):
         self.listener.add_handler(rid, h)
 

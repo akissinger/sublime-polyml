@@ -20,26 +20,26 @@ class Field:
 def parse_rec(rec_str):
 	# kill comments, tabs, and line breaks
 	rec_str = re.sub('\\(\\*.*?\\*\\)', '', rec_str.replace('\n','').replace('\t',' '))
-	
+
 	# grab record contents
 	m = re.match('\\s*datatype\\s+(\\w*)\\s*=\\s*(\\w*)\\s*of\\s*\\{\\s*(.*)\\s*\\}\\s*', rec_str)
-	
+
 	if not m: return None
-	
+
 	rec = Record()
 	rec.type = m.group(1).strip()
 	rec.constructor = m.group(2).strip()
-	
+
 	field_strs = re.split('\\s*,\\s*', m.group(3))
-	
+
 	for s in field_strs:
 		arr = re.split('\\s*:\\s*', s)
 		if len(arr) != 2: return None
-		
+
 		arr[1] = arr[1].strip()
 		if re.search('->|\\*', arr[1]):
 			arr[1] = '(' + arr[1] + ')'
-		
+
 		rec.add_field(Field(arr[0],arr[1]))
 	return rec
 
@@ -47,43 +47,43 @@ def sig_for_record(rec_str):
 	rec = parse_rec(rec_str)
 	if rec == None: return None
 	out = ''
-	
-	
+
+
 	for field in rec.fields:
 		out += '  val update_{0} : ({1} -> {1}) -> {2} -> {2}\n'.format(field.name.ljust(rec.maxw), field.type, rec.type)
-	
+
 	for field in rec.fields:
 		out += '  val get_{0}    : {2} -> {1}\n'.format(field.name.ljust(rec.maxw), field.type, rec.type)
-		
+
 	for field in rec.fields:
 		out += '  val set_{0}    : {1} -> {2} -> {2}\n'.format(field.name.ljust(rec.maxw), field.type, rec.type)
-		
+
 	return out
 
 def struct_for_record(rec_str):
 	rec = parse_rec(rec_str)
 	if rec == None: return None
 	out = ''
-	
+
 	maxw = 0
 	for field in rec.fields:
 		if len(field.name) > maxw: maxw = len(field.name)
-	
+
 	for field in rec.fields:
 		assigns = []
 		for f2 in rec.fields:
 			if field.name==f2.name: assigns.append('    {0} = f(#{1} r)'.format(f2.name.ljust(rec.maxw), f2.name))
 			else: assigns.append('    {0} = #{1} r'.format(f2.name.ljust(rec.maxw), f2.name))
 		out += '  fun update_{0} f ({1} r) = {1} {{\n{2}\n  }}\n\n'.format(field.name, rec.constructor, ',\n'.join(assigns))
-	
+
 	for field in rec.fields:
 		out += '  fun get_{0} ({2} r) = #{1} r\n'.format(field.name.ljust(rec.maxw), field.name, rec.constructor)
-	
+
 	out += '\n'
-	
+
 	for field in rec.fields:
 		out += '  val set_{0}    = update_{0} o K\n'.format(field.name.ljust(rec.maxw))
-		
+
 	return out
 
 if __name__ == '__main__':
@@ -108,7 +108,6 @@ if __name__ == '__main__':
 	    ps_nodeverts : V.NSet.T
 	  }
 	"""
-	
+
 	print sig_for_record(record)
 	print struct_for_record(record)
-	
