@@ -37,6 +37,10 @@ if !exists('g:polyml_cwindow')
     let g:polyml_cwindow = 1
 endif
 
+if !exists('g:poly_bin')
+    let g:poly_bin = 'poly'
+endif
+
 if !exists('g:polyml_accessor_buffer_name')
     let g:polyml_accessor_buffer_name = '__poly_accessors__'
 endif
@@ -50,7 +54,11 @@ if exists(':PolymlGetType') != 2
 endif
 
 if exists(':PolymlAccessors') != 2
-    command -range=% PolymlAccessors :<line1>,<line2>python PolymlCreateAccessors()
+    command -range PolymlAccessors :<line1>,<line2>python PolymlCreateAccessors()
+endif
+
+if exists(':PolymlAccessorSigs') != 2
+    command -range PolymlAccessorSigs :<line1>,<line2>python PolymlCreateAccessorSigs()
 endif
 
 python <<EOP
@@ -88,42 +96,76 @@ def rowcol(lines,offset):
         i += 1
     return i,offset
 
-def poly_get_type():
+class PolymlProcessedNode:
+    def __init__(self, node, start_row, start_col, end_row, end_col, text):
+        self.node = node
+        self.start_row = start_row
+        self.start_col = start_col
+        self.end_row = end_row
+        self.end_col = end_col
+        self.text = text
+
+def poly_get_node(poly_inst=None):
     path = vim.current.buffer.name
     if not path:
         vim.command('echo "You must save and compile the file first!"')
-        return
+        return None
     lines = vim.current.buffer[:]
     row,col = vim.current.window.cursor
     line_start_pos = 0
     for i in range(row-1):
         line_start_pos += len(lines[i]) + 1
-    poly_bin = vim.eval('g:poly_bin')
-    poly_inst = poly.global_instance(poly_bin)
+    if not poly_inst:
+        poly_bin = vim.eval('g:poly_bin')
+        poly_inst = poly.global_instance(poly_bin)
     if not poly_inst.has_built(path):
         vim.command('echo "You must compile the file first!"')
-        return
+        return None
     try:
         node = poly_inst.node_for_position(path, line_start_pos + col)
-        if node:
-            ml_type = poly_inst.type_for_node(node)
-            name_start = node.start - line_start_pos
-            name_end = node.end - line_start_pos
-            if (name_start < 0 or name_end > len(lines[row-1])):
-                if ml_type:
-                    vim.command('echo "Expression spans multiple lines, and has type {0}"'.format(ml_type.replace("'","''")))
-                else:
-                    vim.command('echo "Expression spans multiple lines, and has no type"')
-            else:
-                name = lines[row-1][name_start:name_end]
-                if ml_type:
-                    vim.command('echo "val {0} : {1}"'.format(name.replace("'","''"), ml_type.replace("'","''")))
-                else:
-                    vim.command("echo 'Expression \"{0}\" has no type'".format(name.replace("'","''")))
-        else:
+        if not node:
             vim.command('echo "Failed to find parse tree location"')
+            return None
+        start_col = node.start - line_start_pos
+        start_row = row
+        while start_col < 0:
+            start_row -= 1
+            start_col += len(lines[start_row-1]) + 1
+        end_col = node.end - line_start_pos
+        end_row = row
+        while end_col > len(lines[end_row-1]):
+            end_col -= len(lines[end_row-1]) + 1
+            end_row += 1
+        if end_row > start_row:
+            text = lines[start_row-1][start_col:]
+            for i in range(start_row,end_row-1):
+                text += '\n'
+                text += lines[i]
+            text += '\n'
+            text += lines[end_row-1][:end_col]
+        else:
+            text = lines[start_row-1][start_col:end_col]
+        return PolymlProcessedNode(node, start_row, start_col, end_row, end_col, text)
     except poly.process.Timeout:
         vim.command('echo "Request timed out"')
+        return None
+
+def poly_get_type():
+    poly_bin = vim.eval('g:poly_bin')
+    poly_inst = poly.global_instance(poly_bin)
+    pnode = poly_get_node(poly_inst)
+    if pnode:
+        ml_type = poly_inst.type_for_node(pnode.node)
+        if (pnode.end_row > pnode.start_row):
+            if ml_type:
+                vim.command('echo "Expression spans multiple lines, and has type {0}"'.format(ml_type.replace("'","''")))
+            else:
+                vim.command('echo "Expression spans multiple lines, and has no type"')
+        else:
+            if ml_type:
+                vim.command('echo "val {0} : {1}"'.format(pnode.text.replace("'","''"), ml_type.replace("'","''")))
+            else:
+                vim.command("echo 'Expression \"{0}\" has no type'".format(pnode.text.replace("'","''")))
 
 def poly_format_message(msg):
         if msg.message_code == 'E':
@@ -168,9 +210,6 @@ def poly_format_message(msg):
 EOP
 
 function! Polyml(...)
-    if !exists('g:poly_bin')
-        let g:poly_bin = 'poly'
-    endif
     let l:output = []
     let l:success = 0
     let l:timeout = 10
@@ -224,9 +263,6 @@ EOP
 endfunction
 
 function! PolymlGetType()
-    if !exists('g:poly_bin')
-        let g:poly_bin = 'poly'
-    endif
     python poly_get_type()
 endfunction
 
@@ -268,20 +304,37 @@ function! Poly_get_accessor_buffer()
 endfunction
 
 python <<EOP
-def PolymlCreateAccessors():
+def poly_fill_accessor_buffer(generator):
     if len(vim.current.range) == 0:
         vim.command("echo 'No range given'")
         return
-    accessors = poly.accessors.sig_for_record("\n".join(vim.current.range[:]))
+    accessors = generator("\n".join(vim.current.range[:]))
+    # default range length will be 1
+    if not accessors:
+        # try finding if the cursor is on a datatype
+        pnode = poly_get_node()
+        if not pnode:
+            return
+        accessors = generator(pnode.text)
     if not accessors:
         vim.command("echo 'Range is not a record'")
         return
     bufidx = int(vim.eval('Poly_get_accessor_buffer()')) - 1
     vim.buffers[bufidx][:] = accessors.split('\n')
+
+def PolymlCreateAccessorSigs():
+    poly_fill_accessor_buffer(poly.accessors.sig_for_record)
+
+def PolymlCreateAccessors():
+    poly_fill_accessor_buffer(poly.accessors.struct_for_record)
 EOP
 
 au VimLeave * python poly.kill_global_instance()
 
 map <silent> <F5> :Polyml<CR>
+map <silent> <LocalLeader>pc :Polyml<CR>
+map <silent> <LocalLeader>pt :PolymlGetType<CR>
+map <silent> <LocalLeader>pa :PolymlAccessors<CR>
+map <silent> <LocalLeader>ps :PolymlAccessorSigs<CR>
 
 " vim:sts=4:sw=4:et
