@@ -149,11 +149,7 @@ class PolyMessage:
                 self.text)
 
 class PolyException(PolyMessage):
-    """A message detailing an exception from Poly/ML
-
-    file_name -- the file where the exception occurred
-    text -- the message text
-    """
+    """A message detailing an exception from Poly/ML"""
 
     def __init__(self, text, location=None):
         self.message_code = 'X'
@@ -161,27 +157,11 @@ class PolyException(PolyMessage):
         self.location = location
 
 class PolyErrorMessage(PolyMessage):
-    """A message detailing an error (or warning) from Poly/ML
-
-    file_name -- the file where the exception occurred
-    line -- (optional) the line number where the error occurred
-    start_pos -- the starting offset of the part of the file
-                 referred to by the error message
-    end_pos -- the ending offset of the part of the file
-                 referred to by the error message
-    text -- the message text
-
-    If line is None, start and end are absolute offsets in the file.
-    Otherwise, they are relative to the line (FIXME: is this true?)
-    """
+    """A message detailing an error (or warning) from Poly/ML"""
 
     def __init__(self, message_code, file_name, line, start_pos, end_pos, text):
         self.message_code = message_code
         self.location = PolyLocation(file_name, line, start_pos, end_pos)
-        self.file_name = file_name
-        self.line = line
-        self.start_pos = int(start_pos)
-        self.end_pos = int(end_pos)
         self.text = text
 
 class Poly:
