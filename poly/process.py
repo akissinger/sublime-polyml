@@ -7,12 +7,17 @@ import os
 import time
 import select
 
+"""Manages the Poly/ML process"""
+
+# debugging levels
 DEBUG_WARN = 1
 DEBUG_INFO = 2
 DEBUG_FINE = 3
 DEBUG_FINEST = 4
 
+# the active debugging level
 DEBUG_LEVEL = 1
+# whether to use colours in debug output
 DEBUG_COLOR = False
 
 # used for debug output
@@ -21,22 +26,36 @@ VTGREEN =  '\x1b[32;1m'
 VTCLEAR =  '\x1b[0m'
 
 def debug(s, level = DEBUG_INFO):
+    """Prints a statement if the debug level is high enough.
+
+    s -- the message to print
+    level -- the minimum debug level to print at
+    """
     if DEBUG_LEVEL >= level:
         print(s)
 
 def set_debug_level(level):
+    """Set the debug level."""
     DEBUG_LEVEL = level
 
 class ProtocolError(Exception):
+    """Indicates a communication problem with Poly/ML.
+
+    This can be receiving unexpected data, or Poly/ML
+    crashing, or the binary not being found.
+    """
     pass
 
 class ListenerKilled(Exception):
+    """Indicates that the listener thread was killed."""
     pass
 
 class Timeout(Exception):
+    """Indicates that a synchronous request timed out."""
     pass
 
 class EscCode:
+    """An escape code in the Poly/ML data stream."""
     def __init__(self, code):
         self.code = code
 
@@ -44,16 +63,24 @@ class EscCode:
         return 'ESC[' + self.code + ']'
 
 class Packet:
+    """A packet received from Poly/ML."""
+
     def __init__(self, initial=[]):
         self.tokens = deque(initial)
 
     def copy(self):
+        """Returns a copy of this packet."""
         return Packet(self.tokens)
 
     def append(self, token):
+        """Append a token to the queue."""
         self.tokens.append(token)
 
     def is_response(self):
+        """Whether this packet is a recognised response message.
+
+        Should not be called after popping any tokens.
+        """
         # M is currently unimplemented, as it doesn't provide a request-id
         if self.tokens[0].__class__ == EscCode:
             return (self.tokens[0].code == 'R' or
@@ -65,9 +92,17 @@ class Packet:
             raise ProtocolError("Malformed packet.")
 
     def pop(self):
+        """Pop a token from the packet.
+
+        Returns a string or an EscCode object
+        """
         return self.tokens.popleft()
 
     def popint(self):
+        """Pops an integer from the packet.
+
+        Raises a ProtocolError if the token was not an int.
+        """
         val = self.tokens.popleft()
         try:
             if val.__class__ == EscCode:
@@ -78,6 +113,10 @@ class Packet:
             raise ProtocolError("Expected int, got: {0}".format(repr(val)))
 
     def popstr(self):
+        """Pops a string from the packet.
+
+        Raises a ProtocolError if the token was an escape code.
+        """
         val = self.tokens.popleft()
         if (val.__class__ != EscCode):
             return val
@@ -85,6 +124,15 @@ class Packet:
             raise ProtocolError("Expected string, got: {0}".format(repr(val)))
 
     def popcode(self, code=None):
+        """Pops an escape code from the packet.
+
+        code -- (optional) require that this is the code that is popped
+                (use None for any code)
+
+        Returns an EscCode object.
+        Raises a ProtocolError if the token was not an escape code, or
+        was the wrong escape code.
+        """
         val = self.tokens.popleft()
         if code == None:
             if val.__class__ == EscCode:
@@ -98,30 +146,47 @@ class Packet:
                 raise ProtocolError("Expected code '{0}', got: {1}".format(code, repr(val)))
 
     def pop_until_nonempty(self):
+        """Pop any empty string tokens at the top of the packet."""
         while len(self.tokens) != 0 and self.tokens[0] == '':
             self.pop()
 
     def popempty(self):
+        """Pop an empty string token.
+
+        Raises a ProtocolError if the top token is not an empty string.
+        """
         val = self.tokens.popleft()
         if (val != ''):
             raise ProtocolError("Expected '', got {0}".format(repr(val)))
 
     def popuntilcode(self, code):
+        """Pop tokens until reaching the given escape code."""
         while len(self.tokens) != 0:
             val = self.pop()
             if (val.__class__ == EscCode and val.code == code):
                 break
 
     def pushcode(self, code):
+        """Push an escape code onto the front of the packet.
+
+        Can be useful for putting back a token.
+        """
         self.tokens.appendleft(EscCode(code))
 
     def pushstr(self, str):
+        """Push a string onto the front of the packet.
+
+        Can be useful for putting back a token.
+        """
         self.tokens.appendleft(str)
 
     def nextiscode(self):
+        """Whether the next token is an escape code."""
         return self.tokens[0].__class__ == EscCode
 
 class PacketListener(Thread):
+    """The thread that listens to responses from Poly/ML."""
+
     def __init__(self, poly_pipe):
         Thread.__init__(self)
         self.input = poly_pipe.stdout
@@ -221,8 +286,9 @@ class PacketListener(Thread):
                 debug('Listener killed', DEBUG_INFO)
                 break
 
-
 class PolyProcess:
+    """Controls the Poly/ML process."""
+
     def __init__(self, poly_bin):
         self.request_id = 0
         debug ("executing '%s'" % poly_bin, DEBUG_INFO)
@@ -244,17 +310,31 @@ class PolyProcess:
             if self.is_alive(): self.kill()
 
     def write(self, s):
+        """Write a string to Poly/ML."""
         self.pipe.stdin.write(s)
 
     def is_alive(self):
+        """Whether Poly/ML is running."""
         return (self.pipe.poll() == None)
 
     def kill(self):
+        """Kills Poly/ML."""
         self.pipe.terminate()
 
-    # send a synchronous request with a given timeout
-    # returns None on timeout
     def sync_request(self, code, args, timeout=2):
+        """Send a request to Poly/ML and wait for the response.
+
+        code -- the request code (a single letter)
+        args -- a list of arguments (strings)
+        timeout -- (optional) the maximum time to wait for a response, in
+                   seconds (default: 2); pass None to wait indefinitely
+
+        The args will be separated by escaped commas.
+
+        Returns a Packet object.
+        Raises a Timeout exception if no response was received after timeout
+        seconds.
+        """
         packet_ready = threading.Condition()
         packet = []
 
@@ -279,8 +359,18 @@ class PolyProcess:
             debug("Request timed out", DEBUG_INFO)
             raise Timeout()
 
-    # handler is either a handler or a list of handlers
     def send_request(self, code, args, handler = None):
+        """Send a request to Poly/ML.
+
+        code -- the request code (a single letter)
+        args -- a list of arguments (strings)
+        handler -- (optional) a method (or list of methods) to
+                   call when the response is received
+
+        Any handler methods must accept one arguments: the received Packet.
+
+        Returns the id of the request (an int).
+        """
         request_string = '\x1b{0}{1}\x1b,{2}\x1b{3}'.format(
             code.upper(), self.request_id,
             '\x1b,'.join([str(x) for x in args]), code.lower())
@@ -295,5 +385,10 @@ class PolyProcess:
         return (self.request_id - 1)
 
     def add_handler(self, rid, h):
+        """Add a handler for a given request/response id.
+
+        WARNING: using this induces a race condition; pass your handlers
+        directly to send_request() instead.
+        """
         self.listener.add_handler(rid, h)
 
