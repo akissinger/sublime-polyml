@@ -73,13 +73,14 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
                     error_regions = []
                     
                     for msg in messages:
-                        line,start_col = view.rowcol(msg.start_pos)
+                        line,start_col = view.rowcol(msg.location.start)
                         line += 1  # counting lines from 1
-                        end_col = view.rowcol(msg.end_pos)[1]
-                        error_regions.append(sublime.Region(msg.start_pos, msg.end_pos))
+                        end_col = view.rowcol(msg.location.end)[1]
+                        error_regions.append(sublime.Region(msg.location.start,
+                                                            msg.location.end))
                         
                         polyio.println("{0}:{1}:({2}-{3}): {4}".format(
-                            os.path.basename(msg.file_name),
+                            os.path.basename(msg.location.file_name),
                             line,
                             start_col + 1,
                             end_col + 1,
