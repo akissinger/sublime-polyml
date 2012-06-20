@@ -455,13 +455,10 @@ class Poly:
         file -- the file name for the compilation
 
         Returns a pair of result code (a single-character string) and
-        a list of PolyMessage objects.  If the result code is 'X', the
-        first will be a PolyException and the remainder PolyErrorMessage
-        objects, otherwise they will all be PolyErrorMessage objects.
+        a list of PolyMessage objects.
         """
         result_code = self._pop_compile_result(p, file)
         if result_code == 'X':
-            # currently do nothing with this
             messages = [self._pop_compile_exception_message(p)]
             messages += self._pop_compile_error_messages(p)
         else:
