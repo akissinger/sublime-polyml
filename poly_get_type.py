@@ -16,12 +16,15 @@ class DescribePolySymbolCommand(sublime_plugin.WindowCommand):
         
         if self.poly.has_built(path):
             position = view.sel()[0].begin()
-            node = self.poly.node_for_position(path, position)
-            name = view.substr(sublime.Region(node.start, node.end))
-            ml_type = self.poly.type_for_node(node)
-            
-            if ml_type != None:
-                polyio.println('val %s : %s' % (name, ml_type))
+            try:
+                node = self.poly.node_for_position(path, position)
+                name = view.substr(sublime.Region(node.start, node.end))
+                ml_type = self.poly.type_for_node(node)
+                
+                if ml_type != None:
+                    polyio.println('val %s : %s' % (name, ml_type))
+            except poly.process.Timeout:
+                pass
             
             polyio.println()
         else:
