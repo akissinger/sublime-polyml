@@ -97,6 +97,9 @@ class Packet:
             else:
                 raise ProtocolError("Expected code '{0}', got: {1}".format(code, repr(val)))
 
+    def pop_until_nonempty(self):
+        while len(self.tokens) != 0 and self.tokens[0] == '':
+            self.pop()
 
     def popempty(self):
         val = self.tokens.popleft()
@@ -108,6 +111,15 @@ class Packet:
             val = self.pop()
             if (val.__class__ == EscCode and val.code == code):
                 break
+
+    def pushcode(self, code):
+        self.tokens.appendleft(EscCode(code))
+
+    def pushstr(self, str):
+        self.tokens.appendleft(str)
+
+    def nextiscode(self):
+        return self.tokens[0].__class__ == EscCode
 
 class PacketListener(Thread):
     def __init__(self, poly_pipe):

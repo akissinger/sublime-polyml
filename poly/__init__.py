@@ -48,64 +48,6 @@ def kill_global_instance():
         poly_global = None
     gc.collect()
 
-class PolyMessage:
-    """A message from Poly/ML
-
-    text -- the message text
-    """
-
-    def __init__(self, text):
-        self.text = text
-
-    def __str__(self):
-        return self.text
-
-    def __repr__(self):
-        return repr(self.__str__())
-
-class PolyException(PolyMessage):
-    """A message detailing an exception from Poly/ML
-
-    file_name -- the file where the exception occurred
-    text -- the message text
-    """
-
-    def __init__(self, file_name, text):
-        self.file_name = file_name
-        self.text = text
-
-    def __str__(self):
-        return "Exception in '{0}': {1}".format(
-            self.file_name,
-            self.text)
-
-class PolyErrorMessage(PolyMessage):
-    """A message detailing an error (or warning) from Poly/ML
-
-    message_code -- 'E' for an error, 'W' for a warning
-    file_name -- the file where the exception occurred
-    start_pos -- the starting offset of the part of the file
-                 referred to by the error message
-    end_pos -- the ending offset of the part of the file
-                 referred to by the error message
-    text -- the message text
-    """
-
-    def __init__(self, message_code, file_name, start_pos, end_pos, text):
-        self.message_code = message_code
-        self.file_name = file_name
-        self.start_pos = int(start_pos)
-        self.end_pos = int(end_pos)
-        self.text = text
-
-    def __str__(self):
-        return "{0} in '{1}' ({2}-{3}): {4}".format(
-            'Error' if self.message_code == 'E' else 'Warning',
-            self.file_name,
-            self.start_pos,
-            self.end_pos,
-            self.text)
-
 class PolyLocation:
     """A location (range) in a file.
 
@@ -124,9 +66,17 @@ class PolyLocation:
         self.line = line
         self.file_name = file_name
 
+    def __str__(self):
+        if self.line:
+            return ("line {1} of {0} ({2}-{3})".format(
+                self.file_name, self.line, self.start, self.end))
+        else:
+            return ("{0} ({1}-{2})".format(
+                self.file_name, self.start, self.end))
+
     def __repr__(self):
-        return ("<PolyLocation file_name={0} line={1} start={2} end={3}>".format(
-            self.file_name, self.line, self.start, self.end))
+        return "<PolyLocation: file_name='{1}' line={2} start={3} end={4}>".format(
+            self.__class__, self.file_name, self.line, self.start, self.end)
 
 class PolyNode(PolyLocation):
     """A node in a Poly/ML parse tree.
@@ -148,9 +98,91 @@ class PolyNode(PolyLocation):
         self.commands = commands[:] # shallow copy
 
     def __repr__(self):
-        return ("<PolyNode file_name={0} line={5} start={1} end={2} parse_tree={3} commands={4}>".format(
-                self.file_name, self.start, self.end, self.parse_tree,
-                repr(self.commands), self.line))
+        return "<PolyNode: file_name='{1}' line={2} start={3} end={4} parse_tree={5} commands={6}>".format(
+            self.__class__, self.file_name, self.line, self.start,
+            self.end, self.parse_tree, self.commands)
+
+class PolyMessage:
+    """A message from Poly/ML
+
+    message_code -- 'E' for an error, 'W' for a warning, 'X' for exception,
+                    None for other
+    text -- the message text
+    location -- (optional) location information
+    """
+
+    def __init__(self, message_code, text, location=None):
+        self.message_code = message_code
+        self.text = text
+        self.location = location
+
+    def __str__(self):
+        if self.message_code == 'E':
+            mtype = 'Error: '
+        elif self.message_code == 'W':
+            mtype = 'Warning: '
+        elif self.message_code == 'X':
+            mtype = 'Exception: '
+        else:
+            mtype = ''
+        if self.location:
+            return "{0}{1}: {2}".format(
+                mtype,
+                self.location,
+                self.text)
+        else:
+            return "{0}{1}".format(
+                mtype,
+                self.text)
+
+    def __repr__(self):
+        if self.location:
+            return "<{0} message_code={1} location={2} text='{3}'>".format(
+                self.__class__,
+                self.message_code,
+                repr(self.location),
+                self.text)
+        else:
+            return "<{0} message_code={1} text='{2}'>".format(
+                self.__class__,
+                self.message_code,
+                self.text)
+
+class PolyException(PolyMessage):
+    """A message detailing an exception from Poly/ML
+
+    file_name -- the file where the exception occurred
+    text -- the message text
+    """
+
+    def __init__(self, text, location=None):
+        self.message_code = 'X'
+        self.text = text
+        self.location = location
+
+class PolyErrorMessage(PolyMessage):
+    """A message detailing an error (or warning) from Poly/ML
+
+    file_name -- the file where the exception occurred
+    line -- (optional) the line number where the error occurred
+    start_pos -- the starting offset of the part of the file
+                 referred to by the error message
+    end_pos -- the ending offset of the part of the file
+                 referred to by the error message
+    text -- the message text
+
+    If line is None, start and end are absolute offsets in the file.
+    Otherwise, they are relative to the line (FIXME: is this true?)
+    """
+
+    def __init__(self, message_code, file_name, line, start_pos, end_pos, text):
+        self.message_code = message_code
+        self.location = PolyLocation(file_name, line, start_pos, end_pos)
+        self.file_name = file_name
+        self.line = line
+        self.start_pos = int(start_pos)
+        self.end_pos = int(end_pos)
+        self.text = text
 
 class Poly:
     """The core class for interacting with a Poly/ML instance.
@@ -167,6 +199,10 @@ class Poly:
         self.process = None
         self.compile_in_progress = False
         self._parse_trees = {}
+
+        # for _clean_text()
+        import re
+        self._clean_rexp = re.compile(r"\s+")
 
     def has_built(self, path):
         """Return whether a file has been compiled."""
@@ -285,6 +321,17 @@ class Poly:
         else:
             return None
 
+    def _clean_text(self, text):
+        """Removes excess whitespace from a string.
+
+        Returns the given text with all contiguous whitespace replaced by
+        a single space, and any whitespace at the start or end removed.
+
+        Poly/ML puts newlines into its messages; this allows us to strip
+        them out.
+        """
+        return self._clean_rexp.sub(' ', text.strip())
+
     def _pop_compile_result(self, p, file):
         """Reads an R response and returns the result code as a string
 
@@ -305,6 +352,26 @@ class Poly:
         p.popempty()  # empty string between escape codes
         return result_code
 
+    def _pop_d_message(self, p):
+        """Reads a D message from a Packet
+
+        Returns a pair of PolyLocation and identifier
+        """
+        p.popcode('D')
+        file_name = p.popstr()
+        p.popcode(',')
+        line = p.popint()
+        if not line:
+            line = None
+        p.popcode(',')
+        start = p.popint()
+        p.popcode(',')
+        end = p.popint()
+        p.popcode(';')
+        text = p.popstr()
+        p.popcode('d')
+        return PolyLocation(file_name, line, start, end), text
+
     def _pop_compile_exception_message(self, p):
         """Reads an exception message from an R response
 
@@ -312,12 +379,32 @@ class Poly:
              that has already had _pop_compile_result called on it,
              and had the result 'X'
 
-        Returns the exception message as a string.
+        Returns a PolyException message
         """
         p.popcode('X')  # pop off leading p code
-        message = p.popstr()
-        p.popcode('x')
-        return message.strip()
+        exp = PolyException('')
+        message = ''
+        if not p.nextiscode():
+            message = p.popstr()
+        code = p.popcode().code
+        while code != 'x':
+            if code == 'D':
+                p.pushcode('D')
+                exp.location,text = self._pop_d_message(p)
+                if len(message):
+                    message += ' '
+                message += text
+            else:
+                p.popuntilcode(code.swapcase())
+            if not p.nextiscode():
+                if len(message):
+                    message += ' '
+                n = p.popstr()
+                message += n
+            code = p.popcode().code
+        p.pop_until_nonempty()
+        exp.text = self._clean_text(message)
+        return exp
 
     def _pop_compile_error_messages(self, p):
         """Reads the error list from an R response
@@ -334,14 +421,16 @@ class Poly:
             p.popcode(',')
             file_name = p.popstr()
             p.popcode(',')
-            p.popint()  # ignore line number, seems wrong anyway
+            line = p.popint()
+            if not line:
+                line = None
             p.popcode(',')
             start_pos = p.popint()
             p.popcode(',')
             end_pos = p.popint()
 
             p.popcode(';')
-            text = p.popstr().strip()
+            text = p.popstr()
             code = p.popcode()
 
             # FIXME: IDE protocol docs suggest D isn't nested in E
@@ -355,7 +444,8 @@ class Poly:
 
             p.popempty()  # empty string between escape codes
 
-            messages.append(PolyErrorMessage(message_code, file_name, start_pos, end_pos, text))
+            text = self._clean_text(text)
+            messages.append(PolyErrorMessage(message_code, file_name, line, start_pos, end_pos, text))
         return messages
 
     def _read_compile_response(self, p, file):
@@ -372,8 +462,7 @@ class Poly:
         result_code = self._pop_compile_result(p, file)
         if result_code == 'X':
             # currently do nothing with this
-            messages = [PolyException(file,
-                                      self._pop_compile_exception_message(p))]
+            messages = [self._pop_compile_exception_message(p)]
             messages += self._pop_compile_error_messages(p)
         else:
             # FIXME: format for result code 'L' is unclear
@@ -478,7 +567,7 @@ def run_tests():
             happy_print(type + ' compile result was "' +
                   translate_result_code(result_code) + '", as expected')
         for msg in messages:
-            print('  {0}:({1}--{2}): {3}'.format(msg.file_name, msg.start_pos, msg.end_pos, msg.text))
+            print('  {0}'.format(msg))
 
     def test_handler(result_code, messages):
         compile_done.acquire()
@@ -492,7 +581,7 @@ def run_tests():
         compile_done.notify()
         compile_done.release()
 
-    process.DEBUG_LEVEL = 3
+    process.DEBUG_LEVEL = 4
     process.DEBUG_COLOR = True
 
     poly = Poly()
@@ -517,6 +606,15 @@ def run_tests():
 
     (result_code, messages) = poly.compile_sync('-scratch-', '', 'fun p y = x + y\n')
     output_compile_result('Sync', 'F', result_code, messages)
+
+    mlcode = """fun p x y = x + y
+                val brick = p 1 3
+                exception exp of unit;
+                val foo = brick;
+                raise exp()
+             """
+    (result_code, messages) = poly.compile_sync('-scratch-', '', mlcode)
+    output_compile_result('Sync', 'X', result_code, messages)
 
     mlcode = "fun p x y = x + y\nval foo = p 1 3\nval bar = foo\n"
     (result_code, messages) = poly.compile_sync('-scratch-', '', mlcode)
