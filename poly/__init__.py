@@ -676,16 +676,16 @@ def run_tests():
     check_node(decl_loc, 'foo')
 
     record = """
-	  datatype T = MatchState of {
-	    (* names context for fresh names when copying bboxes in pat *)
-	    names        : int * int,
-	    (* pattern and target graphs *)
-	    pat          : string,
-	    tgt          : string,
-	    (* internal vertex mapping from pat to tgt *)
-	    vmap         : int list
-	  }
-	"""
+      datatype T = MatchState of {
+        (* names context for fresh names when copying bboxes in pat *)
+        names        : int * int,
+        (* pattern and target graphs *)
+        pat          : string,
+        tgt          : string,
+        (* internal vertex mapping from pat to tgt *)
+        vmap         : int list
+      }
+    """
     mlcode = """
       fun K x _ = x
       signature OGRAPH_MATCH_STATE
