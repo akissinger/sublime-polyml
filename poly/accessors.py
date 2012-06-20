@@ -1,23 +1,69 @@
 import re
 
+"""Generate code from record datatypes.
+
+This module speeds up creation of structures based around a record datatype by
+generating the accessor signatures and implementations for you.
+
+The implementation uses regular expressions to parse the record declaration, so
+may not work on all records.
+"""
+
 class Record:
+    """A (parsed) record datatype.
+
+    fields -- a list of Field objects
+    maxw -- the width of the longest field name
+    type -- the ML type name assigned to the record
+    constructor -- the type constructor for the record
+    """
+
 	def __init__(self):
 		self.fields = []
 		self.maxw = 0
 		self.type = None
 		self.constructor = None
+
 	def add_field(self,field):
+        """Adds a field to the record.
+
+        field -- a Field object
+        """
 		self.fields.append(field)
 		if len(field.name) > self.maxw: self.maxw = len(field.name)
 
 class Field:
+    """A field in a record datatype.
+
+    name -- the name of the field (string)
+    type -- the ML type of the field (string)
+    """
+
 	def __init__(self, name=None, typ=None):
 		self.name = name
 		self.type = typ
+
 	def __repr__(self):
 		return ("<Field name=%s type=%s>" % (self.name, self.type))
 
 def parse_rec(rec_str):
+    """Parses a record datatype declaration.
+
+    rec_str -- the StandardML datatype record declaration
+
+    A record declaration looks like
+      datatype <type> = <constructor> of {
+        field1_name : field1_type,
+        field2_name : field2_type,
+        [...]
+        fieldN_name : fieldN_type
+      }
+    Comments and whitespace are ignored.  The only required whitespace is
+    between "datatype" and the type name, and between the constructor name and
+    "of".
+
+    Returns a Record object if parsing was successful, or None.
+    """
 	# kill comments, tabs, and line breaks
 	rec_str = re.sub('\\(\\*.*?\\*\\)', '', rec_str.replace('\n','').replace('\t',' '))
 
@@ -44,6 +90,20 @@ def parse_rec(rec_str):
 	return rec
 
 def sig_for_record(rec_str):
+    """Generates accessor signatures for a record.
+
+    rec_str -- the StandardML datatype record declaration (see parse_rec())
+
+    For each field "fldnm" with type "fldtyp", it will generate an updater,
+    getter and setter in the following form:
+        val update_fldnm : (fldtyp -> fldtyp) -> rectyp -> rectyp
+        val get_fldnm : rectyp -> fldtyp
+        val set_fldnm : rectyp -> fldtyp -> fldtyp
+    where rectyp is the type name of the record.
+
+    Returns the StandardML code in a string, or None if parsing of rec_str
+    failed.
+    """
 	rec = parse_rec(rec_str)
 	if rec == None: return None
 	out = ''
@@ -61,6 +121,19 @@ def sig_for_record(rec_str):
 	return out
 
 def struct_for_record(rec_str):
+    """Generates accessor signatures for a record.
+
+    rec_str -- the StandardML datatype record declaration (see parse_rec())
+
+    See sig_for_record() for the generated function types.
+
+    Note that the generated code makes use of the K function:
+        fun K x _ = x
+    which is not part of the standard basis.
+
+    Returns the StandardML code in a string, or None if parsing of rec_str
+    failed.
+    """
 	rec = parse_rec(rec_str)
 	if rec == None: return None
 	out = ''
