@@ -1,10 +1,11 @@
-$LIB_FILES = Dir[ 'poly/*.py', 'poly/*.pl']
-
 task :default => ['vim-polyml.zip']
 
-file 'vim-polyml.zip' => (['sml_polyml.vim']+$LIB_FILES) do |t|
-  command = ['zip', t.name] + t.prerequisites
-  system(*command)
+file 'vim-polyml.zip' => (['sml_polyml.vim','poly']) do |t|
+  vimsubdir = 'ftplugin'
+  mkdir vimsubdir
+  cp_r t.prerequisites, vimsubdir
+  system('zip', '-r', '-x*.pyc', t.name, vimsubdir)
+  rm_r vimsubdir
 end
 
 task :clean => [] do
