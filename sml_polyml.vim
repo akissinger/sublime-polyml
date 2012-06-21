@@ -1,8 +1,8 @@
 " Poly/ML integration
 " Maintainer:   Alex Merry <dev@randomguy3.me.uk>
-" Last Change:  2012 Jun 19
+" Last Change:  2012 Jun 21
 " Version:      0.1
-" Contributors:
+" Contributors: Alex Merry <dev@randomguy3.me.uk>
 "
 " Installation:
 "   Drop sml_polyml.vim and the poly/ directory into ~/.vim/ftplugin
