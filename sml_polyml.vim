@@ -195,12 +195,11 @@ def poly_format_message(msg):
                 end_col = msg.location.end
             else:
                 # try to find the right buffer
-                bufidx = int(vim.eval("bufnr('{0}')".format(file_name.replace("'","''")))) - 1
-                if bufidx >= 0:
-                    lines = vim.buffers[bufidx][:]
-                else:
-                    # guess at the current buffer
-                    lines = vim.current.buffer[:]
+                buff = vim.current.buffer
+                for b in vim.buffers:
+                    if b.name == file_name:
+                        buff = b
+                lines = buff[:]
                 line,start_col = rowcol(lines,msg.location.start)
                 end_col = rowcol(lines,msg.location.end)[1]
 
@@ -353,7 +352,7 @@ function! Poly_get_accessor_buffer()
     setlocal bufhidden=delete
     setlocal noswapfile
     setlocal nobuflisted
-    return l:scr_bufnum
+    return g:polyml_accessor_buffer_name
 endfunction
 
 python <<EOP
@@ -373,8 +372,14 @@ def poly_fill_accessor_buffer(generator):
         if not accessors:
             vim.command("echoerr 'Range is not a record'")
             return
-        bufidx = int(vim.eval('Poly_get_accessor_buffer()')) - 1
-        vim.buffers[bufidx][:] = accessors.split('\n')
+        vim.command('call Poly_get_accessor_buffer()')
+        # abspath is needed because vim names buffers as though they were
+        # files, even when they're not
+        abufname = os.path.abspath(vim.eval('g:polyml_accessor_buffer_name'))
+        for b in vim.buffers:
+            if b.name == abufname:
+                b[:] = accessors.split('\n')
+                break
     except poly.process.Timeout:
         vim.command('echoerr "Request timed out"')
     except poly.process.ProtocolError:
