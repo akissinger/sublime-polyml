@@ -268,6 +268,10 @@ class Poly:
         Returns a PolyLocation for the declaration, or None.
         This may be a PolyNode.
 
+        Due to a shortcoming of Poly/ML, the location filename will not
+        include the path to the file (FIXME: need some way to specify
+        the search path?)
+
         raises poly.process.Timeout if the request to Poly/ML times out
         raises poly.process.ProtocolError if communication with Poly/ML failed
         """

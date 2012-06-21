@@ -12,20 +12,40 @@
 "   Compile the current file. There is no need to save first, although
 "   QuickFix lists don't work well with unnamed buffers.  The timeout is
 "   in seconds.
-"
 "   Auto-opening the QuickFix window on errors can be disabled with
 "       let g:polyml_cwindow = 0
+"   Default shortcuts: <LocalLeader>pc and <F5>
 "
 "
 "   :PolymlGetType
 "   Gets the type of the expression under the cursor.  If you have edited the
 "   file since the last compile, you should re-compile it with :Polyml first.
+"   Default shortcut: <LocalLeader>pt
+"
+"
+"   :PolymlFindDeclaration
+"   Goes to the declaration of the expression under the cursor.  If you have
+"   edited the file since the last compile, you should re-compile it with
+"   :Polyml first.  Due to a shortcoming of Poly/ML, it will fail to find ML
+"   files that are not in the current directory.
+"   Default shortcut: <LocalLeader>pd
 "
 "
 "   :[range]PolymlAccessors
-"   Generates accessor declarations for a datatype, as selected by [range].
-"   The usual use is to visually highlight (with V) the datatype declaration,
-"   and then call :'<,'>PolymlAccessors
+"   Generates accessor implementations for a record datatype, as selected by
+"   [range].  The usual use is to visually highlight (with V) the datatype
+"   declaration, and then call :'<,'>PolymlAccessors.  If the file has been
+"   compiled, it will try to find a record datatype under the cursor.  These
+"   implementations use the K function
+"       fun K x _ = x
+"   which is not in the standard basis.
+"   Default shortcut: <LocalLeader>pa
+"
+"
+"   :[range]PolymlAccessorSigs
+"   Generates accessor declarations that correspond with the implementations
+"   provided by PolymlAccessors.  Usage is the same as for that command.
+"   Default shortcut: <LocalLeader>ps
 "
 
 if !has('python')
@@ -61,6 +81,10 @@ if exists(':PolymlAccessorSigs') != 2
     command -range PolymlAccessorSigs :<line1>,<line2>python PolymlCreateAccessorSigs()
 endif
 
+if exists(':PolymlFindDeclaration') != 2
+    command PolymlFindDeclaration python PolymlFindDeclaration()
+endif
+
 python <<EOP
 import vim
 import os
@@ -90,6 +114,10 @@ def poly_do_compile(path, ml, timeout):
     return poly_inst.compile_sync(path, preamble, ml, timeout)
 
 def rowcol(lines,offset):
+    """Get the row and column of an offset in a list of lines
+
+    Every value is zero-indexed
+    """
     i = 0
     while (i < len(lines) and offset > len(lines[i])):
         offset -= len(lines[i]) + 1
@@ -207,6 +235,46 @@ def poly_format_message(msg):
                 end_col + 1,
                 msg.text,
                 mtype)
+
+def poly_loc_is_in_buffer(location, buff=None):
+    if not buff:
+        buff = vim.current.buffer
+        if not buff.name or buff.name == '':
+            return location.file_name == '-scratch-'
+    return location.file_name == buff.name
+
+def poly_open_buffer(file_name):
+    return None
+
+def poly_find_buffer(location):
+    if len(location.file_name) == 0 or location.file_name == '-scratch-':
+        # only allow the current buffer to be unnamed
+        return None
+    for b in vim.buffers:
+        if poly_loc_is_in_buffer(location, b):
+            return b
+
+def poly_go_to_location(location):
+    if not poly_loc_is_in_buffer(location):
+        buff = poly_find_buffer(location)
+        if buff:
+            vim.command('hide buffer! \'{0}\''.format(buff.name))
+        else:
+            if len(location.file_name) == 0 or location.file_name == '-scratch-':
+                vim.command('echo "Could not go to location with no file name"')
+                return
+            vim.command('hide edit! {0}'.format(location.file_name))
+        if vim.current.window.buffer.name != os.path.abspath(location.file_name):
+            print("Expected to go to '{0}', went to '{1}'".format(
+                os.path.abspath(location.file_name),
+                vim.current.window.buffer.name))
+            return
+    line,col = location.line,location.start
+    if not line:
+        line,col = rowcol(vim.current.window.buffer[:], location.start)
+        line += 1
+    if line <= len(vim.current.window.buffer) and col < len(vim.current.window.buffer[line-1]):
+        vim.current.window.cursor = line,col
 EOP
 
 function! Polyml(...)
@@ -327,6 +395,22 @@ def PolymlCreateAccessorSigs():
 
 def PolymlCreateAccessors():
     poly_fill_accessor_buffer(poly.accessors.struct_for_record)
+
+def PolymlFindDeclaration():
+    poly_bin = vim.eval('g:poly_bin')
+    poly_inst = poly.global_instance(poly_bin)
+    pnode = poly_get_node(poly_inst)
+    if not pnode:
+        return
+    try:
+        loc = poly_inst.declaration_for_node(pnode.node)
+    except Timeout:
+        vim.command('echo "Communication with Poly/ML timed out"')
+        return
+    if not loc:
+        vim.command('echo "Could not find location of declaration"')
+        return
+    poly_go_to_location(loc)
 EOP
 
 au VimLeave * python poly.kill_global_instance()
@@ -334,6 +418,7 @@ au VimLeave * python poly.kill_global_instance()
 map <silent> <F5> :Polyml<CR>
 map <silent> <LocalLeader>pc :Polyml<CR>
 map <silent> <LocalLeader>pt :PolymlGetType<CR>
+map <silent> <LocalLeader>pd :PolymlFindDeclaration<CR>
 map <silent> <LocalLeader>pa :PolymlAccessors<CR>
 map <silent> <LocalLeader>ps :PolymlAccessorSigs<CR>
 
