@@ -67,7 +67,7 @@ if exists(':Polyml') != 2
 endif
 
 if exists(':PolymlGetType') != 2
-    command PolymlGetType :call PolymlGetType()
+    command PolymlGetType :python PolymlGetType()
 endif
 
 if exists(':PolymlAccessors') != 2
@@ -146,51 +146,30 @@ def poly_get_node(poly_inst=None):
     if not poly_inst.has_built(path):
         vim.command('echoerr "You must compile the file first!"')
         return None
-    try:
-        node = poly_inst.node_for_position(path, line_start_pos + col)
-        if not node:
-            vim.command('echoerr "Failed to find parse tree location"')
-            return None
-        start_col = node.start - line_start_pos
-        start_row = row
-        while start_col < 0:
-            start_row -= 1
-            start_col += len(lines[start_row-1]) + 1
-        end_col = node.end - line_start_pos
-        end_row = row
-        while end_col > len(lines[end_row-1]):
-            end_col -= len(lines[end_row-1]) + 1
-            end_row += 1
-        if end_row > start_row:
-            text = lines[start_row-1][start_col:]
-            for i in range(start_row,end_row-1):
-                text += '\n'
-                text += lines[i]
-            text += '\n'
-            text += lines[end_row-1][:end_col]
-        else:
-            text = lines[start_row-1][start_col:end_col]
-        return PolymlProcessedNode(node, start_row, start_col, end_row, end_col, text)
-    except poly.process.Timeout:
-        vim.command('echoerr "Request timed out"')
+    node = poly_inst.node_for_position(path, line_start_pos + col)
+    if not node:
+        vim.command('echoerr "Failed to find parse tree location"')
         return None
-
-def poly_get_type():
-    poly_bin = vim.eval('g:poly_bin')
-    poly_inst = poly.global_instance(poly_bin)
-    pnode = poly_get_node(poly_inst)
-    if pnode:
-        ml_type = poly_inst.type_for_node(pnode.node)
-        if (pnode.end_row > pnode.start_row):
-            if ml_type:
-                vim.command('echom "Expression spans multiple lines, and has type {0}"'.format(ml_type.replace("'","''")))
-            else:
-                vim.command('echom "Expression spans multiple lines, and has no type"')
-        else:
-            if ml_type:
-                vim.command('echom "val {0} : {1}"'.format(pnode.text.replace("'","''"), ml_type.replace("'","''")))
-            else:
-                vim.command("echom 'Expression \"{0}\" has no type'".format(pnode.text.replace("'","''")))
+    start_col = node.start - line_start_pos
+    start_row = row
+    while start_col < 0:
+        start_row -= 1
+        start_col += len(lines[start_row-1]) + 1
+    end_col = node.end - line_start_pos
+    end_row = row
+    while end_col > len(lines[end_row-1]):
+        end_col -= len(lines[end_row-1]) + 1
+        end_row += 1
+    if end_row > start_row:
+        text = lines[start_row-1][start_col:]
+        for i in range(start_row,end_row-1):
+            text += '\n'
+            text += lines[i]
+        text += '\n'
+        text += lines[end_row-1][:end_col]
+    else:
+        text = lines[start_row-1][start_col:end_col]
+    return PolymlProcessedNode(node, start_row, start_col, end_row, end_col, text)
 
 def poly_format_message(msg):
         if msg.message_code == 'E':
@@ -308,8 +287,10 @@ try:
     del messages
 except poly.process.Timeout:
     vim.command('echoerr "Communication with Poly/ML timed out"')
-except poly.process.ProtocolException:
+except poly.process.ProtocolError:
     vim.command('echoerr "Communication with Poly/ML failed"')
+except Exception as e:
+    vim.command("echoerr 'Caught exception: {0}'".format(repr(e).replace("'","''")))
 EOP
 
     if l:complete
@@ -336,10 +317,6 @@ EOP
         redraw
         echo ''
     endif
-endfunction
-
-function! PolymlGetType()
-    python poly_get_type()
 endfunction
 
 function! s:get_visual_selection()
@@ -398,14 +375,42 @@ def poly_fill_accessor_buffer(generator):
             return
         bufidx = int(vim.eval('Poly_get_accessor_buffer()')) - 1
         vim.buffers[bufidx][:] = accessors.split('\n')
-    except poly.process.ProtocolException:
+    except poly.process.Timeout:
+        vim.command('echoerr "Request timed out"')
+    except poly.process.ProtocolError:
         vim.command('echoerr "Communication with Poly/ML failed"')
+    except Exception as e:
+        vim.command("echoerr 'Caught exception: {0}'".format(repr(e).replace("'","''")))
 
 def PolymlCreateAccessorSigs():
     poly_fill_accessor_buffer(poly.accessors.sig_for_record)
 
 def PolymlCreateAccessors():
     poly_fill_accessor_buffer(poly.accessors.struct_for_record)
+
+def PolymlGetType():
+    try:
+        poly_bin = vim.eval('g:poly_bin')
+        poly_inst = poly.global_instance(poly_bin)
+        pnode = poly_get_node(poly_inst)
+        if pnode:
+            ml_type = poly_inst.type_for_node(pnode.node)
+            if (pnode.end_row > pnode.start_row):
+                if ml_type:
+                    vim.command('echom "Expression spans multiple lines, and has type {0}"'.format(ml_type.replace("'","''")))
+                else:
+                    vim.command('echom "Expression spans multiple lines, and has no type"')
+            else:
+                if ml_type:
+                    vim.command('echom "val {0} : {1}"'.format(pnode.text.replace("'","''"), ml_type.replace("'","''")))
+                else:
+                    vim.command("echom 'Expression \"{0}\" has no type'".format(pnode.text.replace("'","''")))
+    except poly.process.Timeout:
+        vim.command('echoerr "Request timed out"')
+    except poly.process.ProtocolError:
+        vim.command('echoerr "Communication with Poly/ML failed"')
+    except Exception as e:
+        vim.command("echoerr 'Caught exception: {0}'".format(repr(e).replace("'","''")))
 
 def PolymlFindDeclaration():
     try:
@@ -414,20 +419,23 @@ def PolymlFindDeclaration():
         pnode = poly_get_node(poly_inst)
         if not pnode:
             return
-        try:
-            loc = poly_inst.declaration_for_node(pnode.node)
-        except Timeout:
-            vim.command('echoerr "Communication with Poly/ML timed out"')
-            return
+        loc = poly_inst.declaration_for_node(pnode.node)
         if not loc:
             vim.command('echoerr "Could not find location of declaration"')
             return
         poly_go_to_location(loc)
-    except poly.process.ProtocolException:
+    except poly.process.Timeout:
+        vim.command('echoerr "Request timed out"')
+    except poly.process.ProtocolError:
         vim.command('echoerr "Communication with Poly/ML failed"')
+    except Exception as e:
+        vim.command("echoerr 'Caught exception: {0}'".format(repr(e).replace("'","''")))
+
+def poly_cleanup():
+    poly.kill_global_instance()
 EOP
 
-au VimLeave * python poly.kill_global_instance()
+autocmd VimLeave * python poly_cleanup()
 
 map <silent> <F5> :Polyml<CR>
 map <silent> <LocalLeader>pc :Polyml<CR>
