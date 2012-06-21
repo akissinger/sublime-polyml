@@ -35,10 +35,7 @@
 "   Generates accessor implementations for a record datatype, as selected by
 "   [range].  The usual use is to visually highlight (with V) the datatype
 "   declaration, and then call :'<,'>PolymlAccessors.  If the file has been
-"   compiled, it will try to find a record datatype under the cursor.  These
-"   implementations use the K function
-"       fun K x _ = x
-"   which is not in the standard basis.
+"   compiled, it will try to find a record datatype under the cursor.
 "   Default shortcut: <LocalLeader>pa
 "
 "

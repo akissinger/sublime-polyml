@@ -127,10 +127,6 @@ def struct_for_record(rec_str):
 
     See sig_for_record() for the generated function types.
 
-    Note that the generated code makes use of the K function:
-        fun K x _ = x
-    which is not part of the standard basis.
-
     Returns the StandardML code in a string, or None if parsing of rec_str
     failed.
     """
@@ -155,7 +151,7 @@ def struct_for_record(rec_str):
     out += '\n'
 
     for field in rec.fields:
-        out += '  val set_{0}    = update_{0} o K\n'.format(field.name.ljust(rec.maxw))
+        out += '  fun set_{0} x  = update_{0} (fn _ => x)\n'.format(field.name.ljust(rec.maxw))
 
     return out
 
