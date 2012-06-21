@@ -278,6 +278,7 @@ EOP
 
 function! Polyml(...)
     let l:output = []
+    let l:complete = 0
     let l:success = 0
     let l:timeout = 10
     if a:0 > 0
@@ -293,7 +294,9 @@ try:
                                         int(vim.eval('l:timeout')))
 
     hr_result = poly.translate_result_code(result)
-    vim.command("let l:success = 1")
+    vim.command("let l:complete = 1")
+    if result == 'S':
+        vim.command("let l:success = 1")
     vim.command("let l:result = '{0}'".format(hr_result.replace("'","''")))
     vim.command("let l:output = [l:result]".format(hr_result))
 
@@ -307,7 +310,7 @@ except poly.process.Timeout:
     vim.command('echo "Communication with Poly/ML timed out"')
 EOP
 
-    if l:success
+    if l:complete
         redraw
         echo l:result
         " Vim uses the global errorformat for cexpr, not the local one
@@ -315,7 +318,11 @@ EOP
         " the second part matches results from unnamed buffers, but in
         " this case vim cannot jump to the correct position in the file
         setglobal errorformat=%f:%l:%c-%*[0-9]:\ %m,:%l:%c-%*[0-9]:\ %m
-        silent cexpr! l:output
+        if l:success
+            silent cgetexpr l:output
+        else
+            silent hide cexpr! l:output
+        endif
         let &g:errorformat = l:efm_save
 
         if g:polyml_cwindow && len(l:output) > 1
