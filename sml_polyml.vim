@@ -255,6 +255,8 @@ def poly_find_buffer(location):
             return b
 
 def poly_go_to_location(location):
+    # FIXME: can we specify a search path for files that don't have an
+    #        absolute path?
     if not poly_loc_is_in_buffer(location):
         buff = poly_find_buffer(location)
         if buff:
