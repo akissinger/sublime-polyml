@@ -177,7 +177,7 @@ def poly_format_message(msg):
             if msg.location.file_name == '--scratch--':
                 file_name = ''
             else:
-                file_name = os.path.basename(msg.location.file_name)
+                file_name = msg.location.file_name
 
             if msg.location.line:
                 line = msg.location.line
