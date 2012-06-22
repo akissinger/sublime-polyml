@@ -45,6 +45,10 @@
 "   Default shortcut: <LocalLeader>ps
 "
 
+if exists(':Polyml') == 2
+    finish
+endif
+
 if !has('python')
     echoerr "Error: Required vim compiled with +python"
     finish
@@ -62,25 +66,11 @@ if !exists('g:polyml_accessor_buffer_name')
     let g:polyml_accessor_buffer_name = '__poly_accessors__'
 endif
 
-if exists(':Polyml') != 2
-    command -nargs=? Polyml :call Polyml(<args>)
-endif
-
-if exists(':PolymlGetType') != 2
-    command PolymlGetType :python PolymlGetType()
-endif
-
-if exists(':PolymlAccessors') != 2
-    command -range PolymlAccessors :<line1>,<line2>python PolymlCreateAccessors()
-endif
-
-if exists(':PolymlAccessorSigs') != 2
-    command -range PolymlAccessorSigs :<line1>,<line2>python PolymlCreateAccessorSigs()
-endif
-
-if exists(':PolymlFindDeclaration') != 2
-    command PolymlFindDeclaration python PolymlFindDeclaration()
-endif
+command -nargs=? Polyml :call Polyml(<args>)
+command PolymlGetType :python PolymlGetType()
+command -range PolymlAccessors :<line1>,<line2>python PolymlCreateAccessors()
+command -range PolymlAccessorSigs :<line1>,<line2>python PolymlCreateAccessorSigs()
+command PolymlFindDeclaration python PolymlFindDeclaration()
 
 python <<EOP
 import vim
