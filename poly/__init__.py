@@ -3,6 +3,7 @@ import time
 import process
 from process import PolyProcess, ProtocolError, Timeout
 import accessors
+import console
 import gc
 
 """A library for accessing Poly/ML's IDE integration
@@ -562,7 +563,7 @@ def run_tests():
         compile_done.notify()
         compile_done.release()
 
-    process.DEBUG_LEVEL = 4
+    process.DEBUG_LEVEL = 2
     process.DEBUG_COLOR = True
 
     poly = Poly()

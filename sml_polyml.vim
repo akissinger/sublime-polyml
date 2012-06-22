@@ -7,7 +7,16 @@
 " Installation:
 "   Drop sml_polyml.vim and the poly/ directory into ~/.vim/ftplugin
 "
+"   rlwrap is needed for :PolymlConsoleHere
+"
 " Usage:
+"   Note that for :Polyml and :PolymlConsoleHere, if there is a subdirectory
+"   called '.polysave' in the same directory as the file being edited, and
+"   this contains a file with the same name as the file being edited, plus the
+"   extension '.save', this will be loaded as a Poly/ML saved state before
+"   running the file.  These files are created automatically by
+"   PolyML.Project.
+"
 "   :Polyml [timeout]
 "   Compile the current file. There is no need to save first, although
 "   QuickFix lists don't work well with unnamed buffers.  The timeout is
@@ -44,6 +53,12 @@
 "   provided by PolymlAccessors.  Usage is the same as for that command.
 "   Default shortcut: <LocalLeader>ps
 "
+"
+"   :PolymlConsoleHere
+"   Opens a Poly/ML instance in a terminal window (wrapped using rlwrap) with
+"   the current file pre-loaded.
+"   Default shortcut: <LocalLeader>pC
+"
 
 if exists(':Polyml') == 2
     finish
@@ -62,6 +77,10 @@ if !exists('g:poly_bin')
     let g:poly_bin = 'poly'
 endif
 
+if !exists('g:polyml_terminal')
+    let g:polyml_terminal = 'xterm'
+endif
+
 if !exists('g:polyml_accessor_buffer_name')
     let g:polyml_accessor_buffer_name = '__poly_accessors__'
 endif
@@ -71,6 +90,7 @@ command PolymlGetType :python PolymlGetType()
 command -range PolymlAccessors :<line1>,<line2>python PolymlCreateAccessors()
 command -range PolymlAccessorSigs :<line1>,<line2>python PolymlCreateAccessorSigs()
 command PolymlFindDeclaration python PolymlFindDeclaration()
+command PolymlConsoleHere python poly.console.ConsoleThread(vim.current.buffer.name,vim.eval('g:poly_bin'),vim.eval('g:polyml_terminal')).start()
 
 python <<EOP
 import vim
@@ -438,5 +458,6 @@ map <silent> <LocalLeader>pt :PolymlGetType<CR>
 map <silent> <LocalLeader>pd :PolymlFindDeclaration<CR>
 map <silent> <LocalLeader>pa :PolymlAccessors<CR>
 map <silent> <LocalLeader>ps :PolymlAccessorSigs<CR>
+map <silent> <LocalLeader>pC :PolymlConsoleHere<CR>
 
 " vim:sts=4:sw=4:et
