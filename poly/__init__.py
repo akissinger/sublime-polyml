@@ -2,6 +2,7 @@ from sys import stdout
 import time
 import process
 from process import PolyProcess, ProtocolError, Timeout
+from console import ConsoleThread
 import accessors
 import gc
 
