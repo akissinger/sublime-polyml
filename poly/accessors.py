@@ -120,7 +120,7 @@ def sig_for_record(rec_str):
 
     return out
 
-def struct_for_record(rec_str):
+def struct_for_record(rec_str, pretty_updates=False):
     """Generates accessor signatures for a record.
 
     rec_str -- the StandardML datatype record declaration (see parse_rec())
@@ -142,12 +142,22 @@ def struct_for_record(rec_str):
     for field in rec.fields:
         if len(field.name) > maxw: maxw = len(field.name)
 
-    for field in rec.fields:
-        assigns = []
-        for f2 in rec.fields:
-            if field.name==f2.name: assigns.append('    {0} = f(#{1} r)'.format(f2.name.ljust(rec.maxw), f2.name))
-            else: assigns.append('    {0} = #{1} r'.format(f2.name.ljust(rec.maxw), f2.name))
-        out += '  fun update_{0} f ({1} r) = {1} {{\n{2}\n  }}\n\n'.format(field.name, rec.constructor, ',\n'.join(assigns))
+    if pretty_updates:
+        for field in rec.fields:
+            assigns = []
+            for f2 in rec.fields:
+                if field.name==f2.name: assigns.append('    {0} = f(#{1} r)'.format(f2.name.ljust(rec.maxw), f2.name))
+                else: assigns.append('    {0} = #{1} r'.format(f2.name.ljust(rec.maxw), f2.name))
+            out += '  fun update_{0} f ({1} r) = {1} {{\n{2}\n  }}\n\n'.format(field.name, rec.constructor, ',\n'.join(assigns))
+    else:
+        for field in rec.fields:
+            assigns = []
+            for f2 in rec.fields:
+                if field.name==f2.name: assigns.append('{0}=f(#{1} r)'.format(f2.name, f2.name))
+                else: assigns.append('{0}= #{1} r'.format(f2.name, f2.name))
+            out += '  fun update_{0} f ({1} r) = {1} {{{2}}}\n'.format(field.name, rec.constructor, ','.join(assigns))
+        
+        out += '\n'
 
     for field in rec.fields:
         out += '  fun get_{0} ({2} r) = #{1} r\n'.format(field.name.ljust(rec.maxw), field.name, rec.constructor)
