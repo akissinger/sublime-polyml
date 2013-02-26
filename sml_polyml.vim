@@ -296,8 +296,8 @@ try:
     del messages
 except poly.process.Timeout:
     vim.command('echoerr "Communication with Poly/ML timed out"')
-except poly.process.ProtocolError:
-    vim.command('echoerr "Communication with Poly/ML failed"')
+except poly.process.ProtocolError as e:
+    vim.command("echoerr 'Communication with Poly/ML failed: {0}'".format(str(e).replace("'","''")))
 except Exception as e:
     vim.command("echoerr 'Caught exception: {0}'".format(repr(e).replace("'","''")))
 EOP
