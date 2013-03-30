@@ -68,25 +68,29 @@ def parse_rec(rec_str):
     rec_str = re.sub('\\(\\*.*?\\*\\)', '', rec_str.replace('\n','').replace('\t',' '))
 
     # grab record contents
-    m = re.match('\\s*datatype\\s+(\\w*)\\s*=\\s*(\\w*)\\s*of\\s*\\{\\s*(.*)\\s*\\}\\s*', rec_str)
+    m = re.match('\\s*datatype\\s([^=]*)=\\s*(\\w*)\\s*of\\s*\\{\\s*(.*)\\s*\\}\\s*', rec_str)
 
-    if not m: return None
+    if not m:
+        print("failed to parse record")
+        return None
 
     rec = Record()
     rec.type = m.group(1).strip()
     rec.constructor = m.group(2).strip()
 
-    field_strs = re.split('\\s*,\\s*', m.group(3))
+    fname_pat = '([^:]*)'
+    ftype_pat = '(([^,\\(]*|\\([^\\)]*\\))*)'
+    
+    field_pattern = re.compile(fname_pat + ':' + ftype_pat + '(,|$)')
 
-    for s in field_strs:
-        arr = re.split('\\s*:\\s*', s)
-        if len(arr) != 2: return None
+    for mf in re.finditer(field_pattern,m.group(3)):
+        fname = mf.group(1).strip()
+        ftype = mf.group(2).strip()
 
-        arr[1] = arr[1].strip()
-        if re.search('->|\\*', arr[1]):
-            arr[1] = '(' + arr[1] + ')'
+        if re.search('->|\\*', ftype):
+            ftype = '(' + ftype + ')'
 
-        rec.add_field(Field(arr[0],arr[1]))
+        rec.add_field(Field(fname,ftype))
     return rec
 
 def sig_for_record(rec_str):
