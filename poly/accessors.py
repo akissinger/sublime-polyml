@@ -68,22 +68,26 @@ def parse_rec(rec_str):
     rec_str = re.sub('\\(\\*.*?\\*\\)', '', rec_str.replace('\n','').replace('\t',' '))
 
     # grab record contents
-    m = re.match('\\s*datatype\\s([^=]*)=\\s*(\\w*)\\s*of\\s*\\{\\s*(.*)\\s*\\}\\s*', rec_str)
+    m = re.match('\\s*(data)?type\\s([^=]*)=\\s*((\\w*)\\s*of)?\\s*\\{\\s*(.*)\\s*\\}\\s*', rec_str)
 
     if not m:
         print("failed to parse record")
         return None
 
     rec = Record()
-    rec.type = m.group(1).strip()
-    rec.constructor = m.group(2).strip()
+    rec.type = m.group(2).strip()
+    
+    if m.group(4) != None:
+        rec.constructor = m.group(4).strip()
+    else:
+        rec.constructor = None
 
     fname_pat = '([^:]*)'
     ftype_pat = '(([^,\\(]*|\\([^\\)]*\\))*)'
     
     field_pattern = re.compile(fname_pat + ':' + ftype_pat + '(,|$)')
 
-    for mf in re.finditer(field_pattern,m.group(3)):
+    for mf in re.finditer(field_pattern,m.group(5)):
         fname = mf.group(1).strip()
         ftype = mf.group(2).strip()
 
@@ -146,25 +150,27 @@ def struct_for_record(rec_str, pretty_updates=False):
     for field in rec.fields:
         if len(field.name) > maxw: maxw = len(field.name)
 
+    arg = rec.constructor + " r" if rec.constructor != None else "r : " + rec.type
+
     if pretty_updates:
         for field in rec.fields:
             assigns = []
             for f2 in rec.fields:
                 if field.name==f2.name: assigns.append('    {0} = f(#{1} r)'.format(f2.name.ljust(rec.maxw), f2.name))
                 else: assigns.append('    {0} = #{1} r'.format(f2.name.ljust(rec.maxw), f2.name))
-            out += '  fun update_{0} f ({1} r) = {1} {{\n{2}\n  }}\n\n'.format(field.name, rec.constructor, ',\n'.join(assigns))
+            out += '  fun update_{0} f ({1}) = {1} {{\n{2}\n  }}\n\n'.format(field.name, arg, ',\n'.join(assigns))
     else:
         for field in rec.fields:
             assigns = []
             for f2 in rec.fields:
                 if field.name==f2.name: assigns.append('{0}=f(#{1} r)'.format(f2.name, f2.name))
                 else: assigns.append('{0}= #{1} r'.format(f2.name, f2.name))
-            out += '  fun update_{0} f ({1} r) = {1} {{{2}}}\n'.format(field.name, rec.constructor, ','.join(assigns))
+            out += '  fun update_{0} f ({1}) = {{{2}}}\n'.format(field.name, arg, ','.join(assigns))
         
         out += '\n'
 
     for field in rec.fields:
-        out += '  fun get_{0} ({2} r) = #{1} r\n'.format(field.name.ljust(rec.maxw), field.name, rec.constructor)
+        out += '  fun get_{0} ({2}) = #{1} r\n'.format(field.name.ljust(rec.maxw), field.name, arg)
 
     out += '\n'
 
