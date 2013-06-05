@@ -128,7 +128,7 @@ def sig_for_record(rec_str):
 
     return out
 
-def struct_for_record(rec_str, pretty_updates=False):
+def struct_for_record(rec_str, pretty_accessors=False):
     """Generates accessor signatures for a record.
 
     rec_str -- the StandardML datatype record declaration (see parse_rec())
@@ -152,7 +152,7 @@ def struct_for_record(rec_str, pretty_updates=False):
 
     arg = rec.constructor + " r" if rec.constructor != None else "r : " + rec.type
 
-    if pretty_updates:
+    if pretty_accessors:
         for field in rec.fields:
             assigns = []
             for f2 in rec.fields:
