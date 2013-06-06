@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import threading
 import tempfile
 import string
@@ -9,7 +10,7 @@ class ConsoleThread(threading.Thread):
     def __init__(self,path,poly_bin,term):
         threading.Thread.__init__(self)
         self.term = term
-        if self.term == None:
+        if not self.term:
             if sys.platform.startswith('darwin'):
                 term = 'Terminal.app'
             elif os.name == 'posix':
@@ -50,10 +51,13 @@ class ConsoleThread(threading.Thread):
         poly_cmd = ["rlwrap", "-z", os.path.join(filedir, "poly_filter.pl"),
             self.poly_bin, "--use", temp]
 
+        terminal_will_detach = True
         if self.term == 'gnome-terminal':
             cmd = [self.term, '--disable-factory', '-e'] + [string.join(poly_cmd, ' ')]
+            terminal_will_detach = False
         elif self.term == 'konsole':
-            cmd = [self.term, '--nofork'] + poly_cmd
+            cmd = [self.term, '--nofork', '-e'] + poly_cmd
+            terminal_will_detach = False
         elif self.term == 'Terminal.app':
             # rlwrap needs pathname with a space in it to quoted twice
             poly_cmd[2] = "'\\\"%s\\\"'" % poly_cmd[2]
@@ -61,11 +65,15 @@ class ConsoleThread(threading.Thread):
                 '-e', "activate",
                 '-e', "do script \"%s\"" % string.join(poly_cmd, ' '),
                 '-e', "end tell"]
+        elif self.term == 'xterm':
+            cmd = [self.term, '-e'] + poly_cmd
+            terminal_will_detach = False
         else:
             cmd = [self.term, '-e'] + poly_cmd
 
         print cmd
         st = subprocess.call(cmd)
-        time.sleep(10) # give poly time to load tempfile before it is removed
+        if terminal_will_detach:
+            time.sleep(10) # give poly time to load tempfile before it is removed
         os.remove(temp)
 

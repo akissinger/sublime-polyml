@@ -4,6 +4,7 @@ import process
 from process import PolyProcess, ProtocolError, Timeout
 from console import ConsoleThread
 import accessors
+import console
 import gc
 
 """A library for accessing Poly/ML's IDE integration
@@ -269,6 +270,10 @@ class Poly:
         Returns a PolyLocation for the declaration, or None.
         This may be a PolyNode.
 
+        Due to a shortcoming of Poly/ML, the location filename will not
+        include the path to the file (FIXME: need some way to specify
+        the search path?)
+
         raises poly.process.Timeout if the request to Poly/ML times out
         raises poly.process.ProtocolError if communication with Poly/ML failed
         """
@@ -313,26 +318,6 @@ class Poly:
         """
         return self._clean_rexp.sub(' ', text.strip())
 
-    def _pop_compile_result(self, p, file):
-        """Reads an R response and returns the result code as a string
-
-        Also saves the parse tree ID in self._parse_trees.
-
-        p -- a poly.process.Packet containing a compilation result block
-        file -- the key to use for saving the parse tree ID
-        """
-        p.popcode('R')  # pop off leading p code
-        p.pop() # ignore RID
-        p.popcode(',')
-        self._parse_trees[file] = p.pop() # save parse tree ID
-        p.popcode(',')
-        result_code = p.popstr()
-        p.popcode(',')
-        p.popint()  # ignore final offset
-        p.popcode(';')
-        p.popempty()  # empty string between escape codes
-        return result_code
-
     def _pop_d_message(self, p):
         """Reads a D message from a Packet
 
@@ -353,37 +338,68 @@ class Poly:
         p.popcode('d')
         return PolyLocation(file_name, line, start, end), text
 
+    def _pop_output_until_code(self, p, closing_code):
+        """Reads some output, possibly including markup, up to (and including)
+        the next occurrence of closing_code (which should be lower case)
+
+        Returns the output, and the last found location
+        """
+        text = ''
+        location = None
+        if not p.nextiscode():
+            text = p.popstr()
+        code = p.popcode().code
+        while code != closing_code:
+            if code == 'D':
+                p.pushcode('D')
+                location,t = self._pop_d_message(p)
+                if len(text):
+                    text += ' '
+                text += t
+            else:
+                p.popuntilcode(';')
+                text += ' ' + p.popstr().strip()
+                p.popcode(code.lower())
+            if not p.nextiscode():
+                if len(text):
+                    text += ' '
+                n = p.popstr()
+                text += n
+            code = p.popcode().code
+        return location,text
+
+    def _pop_compile_result_header(self, p, file):
+        """Reads an R response and returns the result code as a string
+
+        Also saves the parse tree ID in self._parse_trees.
+
+        p -- a poly.process.Packet containing a compilation result block
+        file -- the key to use for saving the parse tree ID
+        """
+        p.popcode('R')  # pop off leading p code
+        p.pop() # ignore RID
+        p.popcode(',')
+        self._parse_trees[file] = p.pop() # save parse tree ID
+        p.popcode(',')
+        result_code = p.popstr()
+        p.popcode(',')
+        p.popint()  # ignore final offset
+        p.popcode(';')
+        return result_code
+
     def _pop_compile_exception_message(self, p):
         """Reads an exception message from an R response
 
         p -- a poly.process.Packet containing a compilation result block,
-             that has already had _pop_compile_result called on it,
+             that has already had _pop_compile_result_header called on it,
              and had the result 'X'
 
         Returns a PolyException message
         """
+        p.pop_until_nonempty()
         p.popcode('X')  # pop off leading p code
         exp = PolyException('')
-        message = ''
-        if not p.nextiscode():
-            message = p.popstr()
-        code = p.popcode().code
-        while code != 'x':
-            if code == 'D':
-                p.pushcode('D')
-                exp.location,text = self._pop_d_message(p)
-                if len(message):
-                    message += ' '
-                message += text
-            else:
-                p.popuntilcode(code.swapcase())
-            if not p.nextiscode():
-                if len(message):
-                    message += ' '
-                n = p.popstr()
-                message += n
-            code = p.popcode().code
-        p.pop_until_nonempty()
+        exp.location, message = self._pop_output_until_code(p, 'x')
         exp.text = self._clean_text(message)
         return exp
 
@@ -391,12 +407,13 @@ class Poly:
         """Reads the error list from an R response
 
         p -- a poly.process.Packet containing a compilation result block,
-             that has already had _pop_compile_result called on it (and
+             that has already had _pop_compile_result_header called on it (and
              _pop_compile_exception_message if the result was 'X')
 
         Returns a list of PolyErrorMessage objects.
         """
         messages = []
+        p.pop_until_nonempty()
         while p.popcode().code == 'E':
             message_code = p.popstr()
             p.popcode(',')
@@ -411,17 +428,7 @@ class Poly:
             end_pos = p.popint()
 
             p.popcode(';')
-            text = p.popstr()
-            code = p.popcode()
-
-            # FIXME: IDE protocol docs suggest D isn't nested in E
-            while code.code != 'e':
-                if code.code == 'D':
-                    p.popuntilcode(';')
-                    text += ' ' + p.popstr().strip() + ' ' # symbol, TODO: mark this up as a link
-                    code = p.popcode('d')
-                    text += p.popstr().strip() # message text
-                    code = p.popcode()
+            location,text = self._pop_output_until_code(p, 'e')
 
             p.popempty()  # empty string between escape codes
 
@@ -438,13 +445,16 @@ class Poly:
         Returns a pair of result code (a single-character string) and
         a list of PolyMessage objects.
         """
-        result_code = self._pop_compile_result(p, file)
-        if result_code == 'X':
-            messages = [self._pop_compile_exception_message(p)]
-            messages += self._pop_compile_error_messages(p)
+        result_code = self._pop_compile_result_header(p, file)
+        messages = []
+        if result_code == 'L':
+            location,text = self._pop_output_until_code(p, 'r')
+            # this clearly counts as an error
+            messages = [PolyMessage('E', text)]
         else:
-            # FIXME: format for result code 'L' is unclear
-            messages = self._pop_compile_error_messages(p)
+            if result_code == 'X':
+                messages = [self._pop_compile_exception_message(p)]
+            messages += self._pop_compile_error_messages(p)
         return result_code, messages
 
     def compile_sync(self, file, prelude, source, timeout=10):
@@ -559,7 +569,7 @@ def run_tests():
         compile_done.notify()
         compile_done.release()
 
-    process.DEBUG_LEVEL = 4
+    process.DEBUG_LEVEL = 2
     process.DEBUG_COLOR = True
 
     poly = Poly()
