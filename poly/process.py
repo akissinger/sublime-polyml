@@ -289,7 +289,7 @@ class PacketListener(Thread):
 class PolyProcess:
     """Controls the Poly/ML process."""
 
-    def __init__(self, poly_bin):
+    def __init__(self, poly_bin='/usr/local/bin/poly'):
         self.request_id = 0
         debug ("executing '%s'" % poly_bin, DEBUG_INFO)
 

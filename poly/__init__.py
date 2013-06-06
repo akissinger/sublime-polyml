@@ -21,7 +21,7 @@ datatypes which are indepent from Poly (and hence from Poly/ML).
 
 poly_global = None
 
-def global_instance(poly_bin='poly'):
+def global_instance(poly_bin='/usr/local/bin/poly'):
     """Get the global instance of the Poly class
 
     poly_bin -- the path to the Poly/ML binary
