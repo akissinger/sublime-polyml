@@ -66,7 +66,7 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
             
             def h():
                 if code == 'S':
-                    polyio.println("[Success]\n")
+                    polyio.println("[Success]")
                 else:
                     polyio.println("[{0}]\n".format(poly.translate_result_code(code)))
                     

@@ -76,7 +76,8 @@ def output_view():
     global _output_view
     if _output_view == None:
         _output_view = sublime.active_window().get_output_panel("poly")
-        _output_view.set_syntax_file("Packages/sublime-polyml/PolyML Output.tmLanguage")
+        _output_view.set_syntax_file("Packages/PolyML/PolyML Output.tmLanguage")
+        _output_view.settings().set("gutter", False)
     return _output_view
 
 
