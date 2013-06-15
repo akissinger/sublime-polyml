@@ -80,6 +80,14 @@ def output_view():
         _output_view.settings().set("gutter", False)
     return _output_view
 
+def clear_output_view():
+    ov = output_view()
+    ov.set_read_only(False)
+    edit = ov.begin_edit()
+    ov.erase(edit, sublime.Region(0, ov.size()))
+    ov.show(ov.size())
+    ov.end_edit(edit)
+    ov.set_read_only(True)
 
 def show_output_view():
     output_view() # make sure view has been created

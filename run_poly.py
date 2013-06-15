@@ -29,6 +29,7 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
         view.erase_regions('poly-errors')
         
         output_view = polyio.output_view()
+        polyio.clear_output_view()
         polyio.show_output_view()
         polyio.println("Compiling code with Poly/ML...")
         
