@@ -5,10 +5,13 @@ import poly
 import polyio
 
 class DescribePolySymbolCommand(sublime_plugin.WindowCommand):
+    def __init__(self, window):
+        sublime_plugin.WindowCommand.__init__(self, window)
+        self.poly_bin = window.active_view().settings().get('poly_bin')
+        if self.poly_bin == None: self.poly_bin = '/usr/local/bin/poly'
+    
     def run(self):
-        poly_bin = window.active_view().settings().get('poly_bin')
-        if poly_bin == None: poly_bin = '/usr/local/bin/poly'
-        poly_inst = poly.global_instance(poly_bin)
+        poly_inst = poly.global_instance(self.poly_bin)
 
         view = self.window.active_view()
         polyio.show_output_view()
