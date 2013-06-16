@@ -145,8 +145,13 @@ def struct_for_record(rec_str, pretty_accessors=False):
     maxw = 0
     for field in rec.fields:
         if len(field.name) > maxw: maxw = len(field.name)
-
-    arg = rec.constructor + " r" if rec.constructor != None else "r : " + rec.type
+    
+    if rec.constructor == None:
+        rec.constructor = ""
+        arg = "r : " + rec.type
+    else:
+        rec.constructor += " "
+        arg = rec.constructor + "r"
 
     if pretty_accessors:
         for field in rec.fields:
@@ -154,14 +159,14 @@ def struct_for_record(rec_str, pretty_accessors=False):
             for f2 in rec.fields:
                 if field.name==f2.name: assigns.append('    {0} = f(#{1} r)'.format(f2.name.ljust(rec.maxw), f2.name))
                 else: assigns.append('    {0} = #{1} r'.format(f2.name.ljust(rec.maxw), f2.name))
-            out += '  fun update_{0} f ({1}) = {2} {{\n{3}\n  }}\n\n'.format(field.name, arg, rec.constructor, ',\n'.join(assigns))
+            out += '  fun update_{0} f ({1}) = {2}{{\n{3}\n  }}\n\n'.format(field.name, arg, rec.constructor, ',\n'.join(assigns))
     else:
         for field in rec.fields:
             assigns = []
             for f2 in rec.fields:
                 if field.name==f2.name: assigns.append('{0}=f(#{1} r)'.format(f2.name, f2.name))
                 else: assigns.append('{0}= #{1} r'.format(f2.name, f2.name))
-            out += '  fun update_{0} f ({1}) = {2} {{{3}}}\n'.format(field.name, arg, rec.constructor, ','.join(assigns))
+            out += '  fun update_{0} f ({1}) = {2}{{{3}}}\n'.format(field.name, arg, rec.constructor, ','.join(assigns))
         
         out += '\n'
 
