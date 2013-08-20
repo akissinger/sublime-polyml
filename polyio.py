@@ -1,7 +1,17 @@
 import sublime
+import sublime_plugin
 import threading
 import time
 
+class PolyOutputCommand(sublime_plugin.TextCommand):
+    def run(self, edit, text):
+        self.view.insert(edit, self.view.size(), text)
+        self.view.show(self.view.size())
+
+class PolyClearOutputCommand(sublime_plugin.TextCommand):
+    def run(self, edit):        
+        self.view.erase(edit, sublime.Region(0, self.view.size()))
+        self.view.show(self.view.size())
 
 class Spinner(threading.Thread):
     def __init__(self, message):
@@ -34,7 +44,6 @@ class Spinner(threading.Thread):
 
 spinner_lock = threading.Lock()
 active_spinners = []
-
 
 def start_spinner(message):
     global active_spinners, spinner_lock
@@ -83,30 +92,18 @@ def output_view():
 def clear_output_view():
     ov = output_view()
     ov.set_read_only(False)
-    edit = ov.begin_edit()
-    ov.erase(edit, sublime.Region(0, ov.size()))
-    ov.show(ov.size())
-    ov.end_edit(edit)
+    ov.run_command("poly_clear_output")
     ov.set_read_only(True)
 
 def show_output_view():
     output_view() # make sure view has been created
     sublime.active_window().run_command("show_panel", {"panel": "output.poly"})
 
-
 def output(text):
     ov = output_view()
-    # selection_was_at_end = (len(ov.sel()) == 1
-    #     and ov.sel()[0]
-    #         == sublime.Region(ov.size()))
     ov.set_read_only(False)
-    edit = ov.begin_edit()
-    ov.insert(edit, ov.size(), text)
-    # if selection_was_at_end:
-    ov.show(ov.size())
-    ov.end_edit(edit)
+    ov.run_command("poly_output", {'text': text})
     ov.set_read_only(True)
-
 
 def println(text=''):
     output(text + "\n")

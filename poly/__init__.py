@@ -1,10 +1,11 @@
 from sys import stdout
 import time
-import process
-from process import PolyProcess, ProtocolError, Timeout
-from console import ConsoleThread
-import accessors
-import console
+
+from . import process
+from . import accessors
+from . import console
+from .process import PolyProcess, ProtocolError, Timeout
+from .console import ConsoleThread
 import gc
 
 """A library for accessing Poly/ML's IDE integration

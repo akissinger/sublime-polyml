@@ -1,8 +1,8 @@
 import sublime
 import sublime_plugin
 import os
-import poly
-import polyio
+import PolyML.poly
+from . import polyio
 
 class DescribePolySymbolCommand(sublime_plugin.WindowCommand):
     def __init__(self, window):
@@ -11,7 +11,7 @@ class DescribePolySymbolCommand(sublime_plugin.WindowCommand):
         if self.poly_bin == None: self.poly_bin = '/usr/local/bin/poly'
     
     def run(self):
-        poly_inst = poly.global_instance(self.poly_bin)
+        poly_inst = PolyML.poly.global_instance(self.poly_bin)
 
         view = self.window.active_view()
         polyio.show_output_view()
@@ -28,7 +28,7 @@ class DescribePolySymbolCommand(sublime_plugin.WindowCommand):
                     polyio.println('val %s : %s' % (name, ml_type))
                 else:
                     polyio.println("Can't decribe %s" % name)
-            except poly.process.Timeout:
+            except PolyML.poly.process.Timeout:
                 pass
             
             polyio.println()

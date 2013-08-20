@@ -71,7 +71,7 @@ class ConsoleThread(threading.Thread):
         else:
             cmd = [self.term, '-e'] + poly_cmd
 
-        print cmd
+        print(cmd)
         st = subprocess.call(cmd)
         if terminal_will_detach:
             time.sleep(10) # give poly time to load tempfile before it is removed

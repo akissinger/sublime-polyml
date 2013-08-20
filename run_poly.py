@@ -2,10 +2,10 @@ import sublime
 import sublime_plugin
 import os
 import time
-import poly
-import polyio
+import PolyML.poly
+from PolyML import polyio
 from threading import Thread
-          
+
 
 class RunPolyCommand(sublime_plugin.WindowCommand):
     def __init__(self, window):
@@ -20,7 +20,7 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
         if poly_bin == None: poly_bin = '/usr/local/bin/poly'
         
         if self.poly == None or self.poly.poly_bin != poly_bin:
-            self.poly = poly.global_instance(poly_bin)
+            self.poly = PolyML.poly.global_instance(poly_bin)
         
         if self.current_job != None:
             print("Compile job already in progress...")
@@ -69,7 +69,7 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
                 if code == 'S':
                     polyio.println("[Success]")
                 else:
-                    polyio.println("[{0}]\n".format(poly.translate_result_code(code)))
+                    polyio.println("[{0}]\n".format(PolyML.poly.translate_result_code(code)))
                     
                     error_regions = []
                     
@@ -93,7 +93,7 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
         
         try:
             self.current_job = self.poly.compile(path, preamble, ml, handler)
-        except poly.process.ProtocolError as e:
+        except PolyML.poly.process.ProtocolError as e:
             polyio.println("Protocol Error: " + str(e))
             polyio.println("Check that 'poly_bin' is defined correctly in your user settings.")
         else:

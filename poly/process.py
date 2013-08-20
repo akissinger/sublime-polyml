@@ -202,7 +202,7 @@ class PacketListener(Thread):
         while self.listen:
             stream = select.select([self.input],[],[],0.1)[0]
             if len(stream) == 1:
-                c = self.input.read(1)
+                c = self.input.read(1).decode('UTF-8')
                 if DEBUG_LEVEL >= DEBUG_FINEST:
                     if DEBUG_COLOR: sys.stdout.write(VTRED)
                     sys.stdout.write('['+c+']' if c!='\x1b' else '[ESC]')
@@ -311,7 +311,7 @@ class PolyProcess:
 
     def write(self, s):
         """Write a string to Poly/ML."""
-        self.pipe.stdin.write(s)
+        self.pipe.stdin.write(bytes(s, 'UTF-8'))
 
     def is_alive(self):
         """Whether Poly/ML is running."""
