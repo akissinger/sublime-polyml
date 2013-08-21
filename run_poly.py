@@ -87,7 +87,7 @@ class RunPolyCommand(sublime_plugin.WindowCommand):
                             end_col + 1,
                             msg.text))
                     
-                    view.add_regions('poly-errors', error_regions, 'constant', sublime.DRAW_OUTLINED)
+                    view.add_regions('poly-errors', error_regions, 'constant', 'dot', sublime.DRAW_OUTLINED)
             
             sublime.set_timeout(h,0) # execute h() on the main thread
         
